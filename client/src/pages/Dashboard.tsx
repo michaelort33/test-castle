@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
 import { getLoginUrl } from "@/const";
+import { toSafeDate, formatDate } from "@/lib/dates";
 import { CalendarDays, Trophy, Clock, ArrowRight, Castle, LogOut, X } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -44,13 +45,19 @@ export default function Dashboard() {
     return null;
   }
 
-  const upcomingReservations = myReservations?.filter(
-    (r) => r.status === "confirmed" && new Date(r.date + "T23:59:59") >= new Date()
-  ) ?? [];
+  const now = new Date();
 
-  const pastReservations = myReservations?.filter(
-    (r) => r.status !== "confirmed" || new Date(r.date + "T23:59:59") < new Date()
-  ) ?? [];
+  const upcomingReservations = myReservations?.filter((r) => {
+    const d = toSafeDate(r.date);
+    d.setHours(23, 59, 59, 999);
+    return r.status === "confirmed" && d >= now;
+  }) ?? [];
+
+  const pastReservations = myReservations?.filter((r) => {
+    const d = toSafeDate(r.date);
+    d.setHours(23, 59, 59, 999);
+    return r.status !== "confirmed" || d < now;
+  }) ?? [];
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -127,43 +134,46 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="space-y-3">
-                {upcomingReservations.map((res) => (
-                  <div key={res.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                    <div className="flex items-center gap-3">
-                      <div className="text-center min-w-[60px]">
-                        <div className="text-xs text-muted-foreground">
-                          {new Date(res.date + "T00:00:00").toLocaleDateString("en-US", { month: "short" })}
+                {upcomingReservations.map((res) => {
+                  const d = toSafeDate(res.date);
+                  return (
+                    <div key={res.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                      <div className="flex items-center gap-3">
+                        <div className="text-center min-w-[60px]">
+                          <div className="text-xs text-muted-foreground">
+                            {formatDate(d, { month: "short" })}
+                          </div>
+                          <div className="text-lg font-semibold">
+                            {d.getDate()}
+                          </div>
                         </div>
-                        <div className="text-lg font-semibold">
-                          {new Date(res.date + "T00:00:00").getDate()}
+                        <div>
+                          <p className="font-medium">{res.startTime} - {res.endTime}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-sm text-muted-foreground">
+                              {res.duration} min &middot; ${(res.price / 100).toFixed(0)}
+                            </span>
+                            {res.sessionName && (
+                              <Badge variant="secondary" className="text-xs">{res.sessionName}</Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Confirmation: <span className="font-mono">{res.confirmationCode}</span>
+                          </p>
                         </div>
                       </div>
-                      <div>
-                        <p className="font-medium">{res.startTime} - {res.endTime}</p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-sm text-muted-foreground">
-                            {res.duration} min &middot; ${(res.price / 100).toFixed(0)}
-                          </span>
-                          {res.sessionName && (
-                            <Badge variant="secondary" className="text-xs">{res.sessionName}</Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Confirmation: <span className="font-mono">{res.confirmationCode}</span>
-                        </p>
-                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => cancelMutation.mutate({ id: res.id })}
+                        disabled={cancelMutation.isPending}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => cancelMutation.mutate({ id: res.id })}
-                      disabled={cancelMutation.isPending}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
@@ -177,29 +187,32 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {pastReservations.slice(0, 10).map((res) => (
-                  <div key={res.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 opacity-70">
-                    <div className="flex items-center gap-3">
-                      <div className="text-center min-w-[60px]">
-                        <div className="text-xs text-muted-foreground">
-                          {new Date(res.date + "T00:00:00").toLocaleDateString("en-US", { month: "short" })}
+                {pastReservations.slice(0, 10).map((res) => {
+                  const d = toSafeDate(res.date);
+                  return (
+                    <div key={res.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 opacity-70">
+                      <div className="flex items-center gap-3">
+                        <div className="text-center min-w-[60px]">
+                          <div className="text-xs text-muted-foreground">
+                            {formatDate(d, { month: "short" })}
+                          </div>
+                          <div className="text-lg font-semibold">
+                            {d.getDate()}
+                          </div>
                         </div>
-                        <div className="text-lg font-semibold">
-                          {new Date(res.date + "T00:00:00").getDate()}
+                        <div>
+                          <p className="font-medium">{res.startTime} - {res.endTime}</p>
+                          <span className="text-sm text-muted-foreground">
+                            {res.duration} min
+                          </span>
+                          {res.status === "cancelled" && (
+                            <Badge variant="destructive" className="ml-2 text-xs">Cancelled</Badge>
+                          )}
                         </div>
-                      </div>
-                      <div>
-                        <p className="font-medium">{res.startTime} - {res.endTime}</p>
-                        <span className="text-sm text-muted-foreground">
-                          {res.duration} min
-                        </span>
-                        {res.status === "cancelled" && (
-                          <Badge variant="destructive" className="ml-2 text-xs">Cancelled</Badge>
-                        )}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>

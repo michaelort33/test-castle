@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { trpc } from "@/lib/trpc";
 import { getLoginUrl } from "@/const";
+import { toSafeDate, formatDate } from "@/lib/dates";
 import { Castle, LogOut, Users, CalendarDays, Trophy, BarChart3, Check, X, Shield, Tag, Plus } from "lucide-react";
 import { useLocation } from "wouter";
 import { useState, useMemo } from "react";
@@ -216,12 +217,12 @@ function ReservationsTab() {
               {reservations.map(({ reservation: r, userName }) => (
                 <div key={r.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                   <div className="flex items-center gap-3">
-                    <div className="text-center min-w-[60px]">
+                    <div className="text-center min-w-[50px]">
                       <div className="text-xs text-muted-foreground">
-                        {new Date(r.date + "T00:00:00").toLocaleDateString("en-US", { month: "short" })}
+                        {formatDate(r.date, { month: "short" })}
                       </div>
                       <div className="text-lg font-semibold">
-                        {new Date(r.date + "T00:00:00").getDate()}
+                        {toSafeDate(r.date).getDate()}
                       </div>
                     </div>
                     <div>
@@ -434,7 +435,7 @@ function TournamentsTab() {
                   <div>
                     <h4 className="font-semibold">{t.name}</h4>
                     <p className="text-sm text-muted-foreground">
-                      {new Date(t.date + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                      {formatDate(t.date, { weekday: "long", month: "long", day: "numeric" })}
                       {t.startTime && ` · ${t.startTime}`}{t.endTime && ` - ${t.endTime}`}
                     </p>
                     {t.details && <p className="text-sm mt-1">{t.details}</p>}

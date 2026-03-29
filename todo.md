@@ -61,3 +61,7 @@
 - [x] Tournament procedure tests
 - [x] Leaderboard public access test
 - [x] Profile update validation test
+
+## Bug Fixes & Changes (Round 2)
+- [x] Remove login wall — let anyone access and book with just a phone number
+- [x] Fix NaN date bug on reservations (especially March 29th) — shows NaN in admin and user can't see reservation

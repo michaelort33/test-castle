@@ -2,11 +2,11 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { getLoginUrl } from "@/const";
-import { Castle, Clock, DollarSign, Trophy, MapPin, ArrowRight, CalendarDays } from "lucide-react";
+import { Castle, Clock, DollarSign, Trophy, MapPin, ArrowRight, CalendarDays, LogOut } from "lucide-react";
 import { useLocation } from "wouter";
 
 export default function Home() {
-  const { user, loading, isAuthenticated } = useAuth();
+  const { user, loading, isAuthenticated, logout } = useAuth();
   const [, setLocation] = useLocation();
 
   return (
@@ -19,14 +19,14 @@ export default function Home() {
             <span className="font-[family-name:var(--font-display)] text-2xl tracking-wide text-primary">THE CASTLE</span>
           </div>
           <nav className="flex items-center gap-4">
+            <Button variant="ghost" size="sm" onClick={() => setLocation("/book")}>
+              Book Court
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setLocation("/tournaments")}>
+              Tournaments
+            </Button>
             {loading ? null : isAuthenticated ? (
               <>
-                <Button variant="ghost" size="sm" onClick={() => setLocation("/book")}>
-                  Book Court
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setLocation("/tournaments")}>
-                  Tournaments
-                </Button>
                 <Button variant="ghost" size="sm" onClick={() => setLocation("/dashboard")}>
                   Dashboard
                 </Button>
@@ -35,9 +35,12 @@ export default function Home() {
                     Admin
                   </Button>
                 )}
+                <Button variant="ghost" size="sm" className="gap-2" onClick={logout}>
+                  <LogOut className="h-4 w-4" />
+                </Button>
               </>
             ) : (
-              <Button size="sm" onClick={() => { window.location.href = getLoginUrl(); }}>
+              <Button variant="outline" size="sm" onClick={() => { window.location.href = getLoginUrl(); }}>
                 Sign In
               </Button>
             )}
@@ -61,25 +64,14 @@ export default function Home() {
               Farmingdale's premier pickleball facility. One court, no distractions, all day availability. Book your session and own the court.
             </p>
             <div className="flex flex-wrap gap-4">
-              {isAuthenticated ? (
-                <Button
-                  size="lg"
-                  variant="secondary"
-                  className="gap-2 font-semibold"
-                  onClick={() => setLocation("/book")}
-                >
-                  Reserve Now <ArrowRight className="h-4 w-4" />
-                </Button>
-              ) : (
-                <Button
-                  size="lg"
-                  variant="secondary"
-                  className="gap-2 font-semibold"
-                  onClick={() => { window.location.href = getLoginUrl(); }}
-                >
-                  Get Started <ArrowRight className="h-4 w-4" />
-                </Button>
-              )}
+              <Button
+                size="lg"
+                variant="secondary"
+                className="gap-2 font-semibold"
+                onClick={() => setLocation("/book")}
+              >
+                Reserve Now <ArrowRight className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         </div>
@@ -130,12 +122,11 @@ export default function Home() {
           <h2 className="font-[family-name:var(--font-display)] text-3xl md:text-4xl tracking-wide text-center mb-12">
             HOW IT WORKS
           </h2>
-          <div className="grid gap-8 md:grid-cols-4 max-w-4xl mx-auto">
+          <div className="grid gap-8 md:grid-cols-3 max-w-3xl mx-auto">
             {[
-              { step: "1", title: "Sign Up", desc: "Create your account and wait for admin approval." },
-              { step: "2", title: "Pick a Time", desc: "Browse the calendar and select your preferred 30-minute slots." },
-              { step: "3", title: "Confirm", desc: "Enter your phone number and receive a confirmation code." },
-              { step: "4", title: "Play", desc: "Show up and own the court. It's that simple." },
+              { step: "1", title: "Pick a Time", desc: "Browse the calendar and select your preferred 30-minute slots." },
+              { step: "2", title: "Enter Your Phone", desc: "Provide your phone number and receive a confirmation code instantly." },
+              { step: "3", title: "Play", desc: "Show up and own the court. It's that simple." },
             ].map((item) => (
               <div key={item.step} className="text-center">
                 <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground font-[family-name:var(--font-display)] text-2xl flex items-center justify-center mx-auto mb-4">

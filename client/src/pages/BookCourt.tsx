@@ -7,11 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
-import { getLoginUrl } from "@/const";
 import { Castle, LogOut, ArrowLeft, Check, Clock } from "lucide-react";
 import { useLocation } from "wouter";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
+import { toDateString } from "@/lib/dates";
 import { format } from "date-fns";
 
 // Generate time slots from 6:00 AM to 10:00 PM in 30-min intervals
@@ -32,7 +32,7 @@ function timeToMinutes(t: string) {
 }
 
 export default function BookCourt() {
-  const { user, loading, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
 
@@ -45,21 +45,24 @@ export default function BookCourt() {
   const [duration, setDuration] = useState<60 | 120>(60);
   const [phone, setPhone] = useState(user?.phone || "");
   const [email, setEmail] = useState("");
+  const [guestName, setGuestName] = useState("");
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState<{ confirmationCode: string; endTime: string; price: number } | null>(null);
 
-  const dateStr = format(selectedDate, "yyyy-MM-dd");
+  const dateStr = toDateString(selectedDate);
 
+  // Public query — no auth required
   const { data: dayReservations, isLoading: slotsLoading } = trpc.reservation.getByDate.useQuery(
     { date: dateStr },
-    { enabled: isAuthenticated && user?.role !== "unapproved_guest" }
   );
 
   const createMutation = trpc.reservation.create.useMutation({
     onSuccess: (data) => {
       setConfirmationResult(data);
       utils.reservation.getByDate.invalidate({ date: dateStr });
-      utils.reservation.mine.invalidate();
+      if (isAuthenticated) {
+        utils.reservation.mine.invalidate();
+      }
     },
     onError: (err) => toast.error(err.message),
   });
@@ -77,7 +80,6 @@ export default function BookCourt() {
   function isSlotAvailable(slot: string, dur: number) {
     const slotStart = timeToMinutes(slot);
     const slotEnd = slotStart + dur;
-    // Don't allow booking past 10:30 PM
     if (slotEnd > 22 * 60 + 30) return false;
     return !bookedRanges.some((r) => slotStart < r.end && slotEnd > r.start);
   }
@@ -106,24 +108,11 @@ export default function BookCourt() {
       duration,
       contactPhone: phone,
       contactEmail: email || undefined,
+      guestName: guestName || undefined,
     });
   }
 
   const price = duration === 60 ? 50 : 90;
-
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center"><div className="animate-pulse text-muted-foreground">Loading...</div></div>;
-  }
-
-  if (!isAuthenticated) {
-    window.location.href = getLoginUrl();
-    return null;
-  }
-
-  if (user?.role === "unapproved_guest") {
-    setLocation("/pending");
-    return null;
-  }
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -135,21 +124,25 @@ export default function BookCourt() {
             <span className="font-[family-name:var(--font-display)] text-2xl tracking-wide text-primary">THE CASTLE</span>
           </div>
           <nav className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => setLocation("/dashboard")}>Dashboard</Button>
             <Button variant="ghost" size="sm" onClick={() => setLocation("/tournaments")}>Tournaments</Button>
-            {user?.role === "admin" && (
-              <Button variant="outline" size="sm" onClick={() => setLocation("/admin")}>Admin</Button>
+            {isAuthenticated && (
+              <>
+                <Button variant="ghost" size="sm" onClick={() => setLocation("/dashboard")}>Dashboard</Button>
+                {user?.role === "admin" && (
+                  <Button variant="outline" size="sm" onClick={() => setLocation("/admin")}>Admin</Button>
+                )}
+                <Button variant="ghost" size="sm" className="gap-2" onClick={logout}>
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </>
             )}
-            <Button variant="ghost" size="sm" className="gap-2" onClick={logout}>
-              <LogOut className="h-4 w-4" />
-            </Button>
           </nav>
         </div>
       </header>
 
       <main className="container py-8 flex-1">
-        <Button variant="ghost" size="sm" className="gap-1 mb-4" onClick={() => setLocation("/dashboard")}>
-          <ArrowLeft className="h-4 w-4" /> Back to Dashboard
+        <Button variant="ghost" size="sm" className="gap-1 mb-4" onClick={() => setLocation("/")}>
+          <ArrowLeft className="h-4 w-4" /> Back
         </Button>
 
         <h1 className="text-2xl font-semibold mb-6">Book Court Time</h1>
@@ -261,6 +254,18 @@ export default function BookCourt() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {!isAuthenticated && (
+                    <div className="space-y-2">
+                      <Label htmlFor="guestName">Your Name (optional)</Label>
+                      <Input
+                        id="guestName"
+                        type="text"
+                        placeholder="John Doe"
+                        value={guestName}
+                        onChange={(e) => setGuestName(e.target.value)}
+                      />
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label htmlFor="phone">Phone Number *</Label>
                     <Input
@@ -344,8 +349,8 @@ export default function BookCourt() {
             <div className="flex justify-between"><span className="text-muted-foreground">Total</span><span className="font-semibold">${confirmationResult ? (confirmationResult.price / 100).toFixed(0) : ""}</span></div>
           </div>
           <DialogFooter>
-            <Button className="w-full" onClick={() => { setConfirmationResult(null); setShowConfirmDialog(false); setSelectedSlot(null); setLocation("/dashboard"); }}>
-              Go to Dashboard
+            <Button className="w-full" onClick={() => { setConfirmationResult(null); setShowConfirmDialog(false); setSelectedSlot(null); }}>
+              Done
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -54,31 +54,30 @@ describe("auth.me", () => {
 // ─── Reservation Router Tests ────────────────────────────────────
 
 describe("reservation.create", () => {
-  it("rejects unapproved_guest from creating reservation", async () => {
+  it("allows unapproved_guest to create reservation (no login wall)", async () => {
     const user = makeUser({ role: "unapproved_guest" });
     const caller = appRouter.createCaller(makeCtx(user));
 
-    await expect(
-      caller.reservation.create({
-        date: "2026-04-15",
-        startTime: "10:00",
-        duration: 60,
-        contactPhone: "5551234567",
-      })
-    ).rejects.toThrow("pending approval");
+    const result = await caller.reservation.create({
+      date: "2026-05-20",
+      startTime: "06:00",
+      duration: 60,
+      contactPhone: "5551234567",
+    });
+    expect(result.confirmationCode).toBeTruthy();
   });
 
-  it("rejects unauthenticated users", async () => {
+  it("allows anonymous (unauthenticated) users to book", async () => {
     const caller = appRouter.createCaller(makeCtx());
 
-    await expect(
-      caller.reservation.create({
-        date: "2026-04-15",
-        startTime: "10:00",
-        duration: 60,
-        contactPhone: "5551234567",
-      })
-    ).rejects.toThrow();
+    const result = await caller.reservation.create({
+      date: "2026-05-21",
+      startTime: "14:00",
+      duration: 60,
+      contactPhone: "5559876543",
+    });
+    expect(result.confirmationCode).toBeTruthy();
+    expect(result.endTime).toBe("15:00");
   });
 
   it("validates duration must be 60 or 120", async () => {

@@ -23,32 +23,29 @@ import { notifyOwner } from "./_core/notification";
 // ─── Reservation Router ─────────────────────────────────────────
 
 const reservationRouter = router({
-  // Get available slots for a date
-  getByDate: protectedProcedure
+  // Get available slots for a date (public — anyone can view)
+  getByDate: publicProcedure
     .input(z.object({ date: z.string() }))
     .query(async ({ input }) => {
       return getReservationsByDate(input.date);
     }),
 
-  // Get current user's reservations
+  // Get current user's reservations (still requires login)
   mine: protectedProcedure.query(async ({ ctx }) => {
     return getReservationsByUser(ctx.user.id);
   }),
 
-  // Create a new reservation
-  create: protectedProcedure
+  // Create a new reservation (public — anyone can book with a phone number)
+  create: publicProcedure
     .input(z.object({
       date: z.string(),
       startTime: z.string(),
       duration: z.number().refine(d => d === 60 || d === 120, "Duration must be 60 or 120 minutes"),
       contactPhone: z.string().min(1, "Phone number is required"),
       contactEmail: z.string().email().optional().or(z.literal("")),
+      guestName: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      // Check role
-      if (ctx.user.role === "unapproved_guest") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Your account is pending approval. Please wait for admin to approve your access." });
-      }
 
       // Calculate end time
       const [hours, mins] = input.startTime.split(":").map(Number);
@@ -74,8 +71,11 @@ const reservationRouter = router({
       const price = input.duration === 60 ? 5000 : 9000;
       const confirmationCode = nanoid(8).toUpperCase();
 
+      // Use the logged-in user's ID if available, otherwise 0 for anonymous
+      const userId = ctx.user?.id ?? 0;
+
       const id = await createReservation({
-        userId: ctx.user.id,
+        userId,
         date: new Date(input.date + "T00:00:00"),
         startTime: input.startTime,
         endTime,

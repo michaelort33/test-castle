@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, date, time, bigint } from "drizzle-orm/mysql-core";
+import { boolean, int, mysqlEnum, mysqlTable, text, timestamp, varchar, date, time, bigint } from "drizzle-orm/mysql-core";
 
 /**
  * Users table — extended with phone, role enum includes unapproved_guest
@@ -31,8 +31,10 @@ export const reservations = mysqlTable("reservations", {
   duration: int("duration").notNull(), // in minutes: 60 or 120
   price: int("price").notNull(), // in cents: 5000 or 9000
   sessionName: varchar("sessionName", { length: 100 }),
+  fullName: varchar("fullName", { length: 200 }),
   contactPhone: varchar("contactPhone", { length: 20 }).notNull(),
   contactEmail: varchar("contactEmail", { length: 320 }),
+  notifyBeforeReservation: boolean("notifyBeforeReservation").default(true).notNull(),
   confirmationCode: varchar("confirmationCode", { length: 10 }).notNull(),
   status: mysqlEnum("status", ["confirmed", "cancelled"]).default("confirmed").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

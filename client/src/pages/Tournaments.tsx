@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
 import { getLoginUrl } from "@/const";
 import { Castle, LogOut, Trophy, CalendarDays, Users, ArrowLeft, Crown, Medal } from "lucide-react";
+import { formatTimeDisplay } from "@/lib/dates";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 
@@ -232,7 +233,7 @@ function TournamentCard({
         </div>
         <CardDescription>
           {new Date(typeof t.date === 'string' ? t.date + "T00:00:00" : t.date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
-          {t.startTime && ` · ${t.startTime}`}{t.endTime && ` - ${t.endTime}`}
+          {t.startTime && ` · ${formatTimeDisplay(t.startTime)}`}{t.endTime && ` - ${formatTimeDisplay(t.endTime)}`}
         </CardDescription>
       </CardHeader>
       <CardContent>

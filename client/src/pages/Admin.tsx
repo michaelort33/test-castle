@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { trpc } from "@/lib/trpc";
 import { getLoginUrl } from "@/const";
-import { toSafeDate, formatDate } from "@/lib/dates";
+import { toSafeDate, formatDate, formatTimeDisplay as formatTimeAMPM } from "@/lib/dates";
 import { Castle, LogOut, Users, CalendarDays, Trophy, BarChart3, Check, X, Shield, Tag, Plus } from "lucide-react";
 import { useLocation } from "wouter";
 import { useState, useMemo } from "react";
@@ -226,13 +226,14 @@ function ReservationsTab() {
                       </div>
                     </div>
                     <div>
-                      <p className="font-medium">{r.startTime} - {r.endTime}</p>
+                      <p className="font-medium">{formatTimeAMPM(r.startTime)} - {formatTimeAMPM(r.endTime)}</p>
                       <p className="text-sm text-muted-foreground">
-                        {userName || "Unknown"} · {r.contactPhone} · {r.duration >= 60 ? `${Math.floor(r.duration / 60)}h${r.duration % 60 > 0 ? ` ${r.duration % 60}m` : ""}` : `${r.duration}m`} · ${(r.price / 100).toFixed(0)} · <span className="font-mono text-xs">{r.confirmationCode}</span>
+                        {(r as any).fullName || userName || "Unknown"} · {r.contactPhone} · {r.duration >= 60 ? `${Math.floor(r.duration / 60)}h${r.duration % 60 > 0 ? ` ${r.duration % 60}m` : ""}` : `${r.duration}m`} · ${(r.price / 100).toFixed(0)} · <span className="font-mono text-xs">{r.confirmationCode}</span>
                       </p>
                       <div className="flex items-center gap-2 mt-0.5">
                         {r.sessionName && <Badge variant="secondary" className="text-xs">{r.sessionName}</Badge>}
                         <Badge variant={r.status === "confirmed" ? "default" : "destructive"} className="text-xs">{r.status}</Badge>
+                        {(r as any).notifyBeforeReservation && <Badge variant="outline" className="text-xs">Notify</Badge>}
                       </div>
                     </div>
                   </div>
@@ -436,7 +437,7 @@ function TournamentsTab() {
                     <h4 className="font-semibold">{t.name}</h4>
                     <p className="text-sm text-muted-foreground">
                       {formatDate(t.date, { weekday: "long", month: "long", day: "numeric" })}
-                      {t.startTime && ` · ${t.startTime}`}{t.endTime && ` - ${t.endTime}`}
+                      {t.startTime && ` · ${formatTimeAMPM(t.startTime)}`}{t.endTime && ` - ${formatTimeAMPM(t.endTime)}`}
                     </p>
                     {t.details && <p className="text-sm mt-1">{t.details}</p>}
                   </div>

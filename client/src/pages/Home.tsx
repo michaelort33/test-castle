@@ -2,7 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { getLoginUrl } from "@/const";
-import { Castle, Clock, DollarSign, Trophy, MapPin, ArrowRight, CalendarDays, LogOut } from "lucide-react";
+import { Castle, Clock, DollarSign, Trophy, MapPin, ArrowRight, CalendarDays, LogOut, Phone } from "lucide-react";
 import { useLocation } from "wouter";
 
 export default function Home() {
@@ -149,7 +149,16 @@ export default function Home() {
               <MapPin className="h-5 w-5 mt-0.5 shrink-0 text-primary" />
               <div>
                 <p className="font-medium text-foreground">The Castle</p>
-                <p>Farmingdale, NY</p>
+                <p>168 Broadhollow Road</p>
+                <p>Farmingdale, NY 11735</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 text-muted-foreground mt-4">
+              <Phone className="h-5 w-5 mt-0.5 shrink-0 text-primary" />
+              <div>
+                <p className="font-medium text-foreground">
+                  <a href="tel:+16313909661" className="hover:text-primary transition-colors">(631) 390-9661</a>
+                </p>
               </div>
             </div>
             <div className="flex items-start gap-3 text-muted-foreground mt-4">
@@ -170,9 +179,10 @@ export default function Home() {
             <Castle className="h-5 w-5 text-primary" />
             <span className="font-[family-name:var(--font-display)] text-lg tracking-wide text-primary">THE CASTLE</span>
           </div>
-          <p className="text-sm text-muted-foreground">
-            Farmingdale's Premier Pickleball Court
-          </p>
+          <div className="text-sm text-muted-foreground text-center md:text-right">
+            <p>168 Broadhollow Road, Farmingdale, NY 11735</p>
+            <p><a href="tel:+16313909661" className="hover:text-primary transition-colors">(631) 390-9661</a></p>
+          </div>
         </div>
       </footer>
     </div>

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { trpc } from "@/lib/trpc";
 import { Castle, LogOut, ArrowLeft, Check, GripVertical } from "lucide-react";
 import { useLocation } from "wouter";
@@ -71,7 +72,8 @@ export default function BookCourt() {
 
   const [phone, setPhone] = useState(user?.phone || "");
   const [email, setEmail] = useState("");
-  const [guestName, setGuestName] = useState("");
+  const [fullName, setFullName] = useState(user?.name || "");
+  const [notifyBeforeReservation, setNotifyBeforeReservation] = useState(true);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState<{
     confirmationCode: string;
@@ -183,7 +185,8 @@ export default function BookCourt() {
       duration: selectedDuration,
       contactPhone: phone,
       contactEmail: email || undefined,
-      guestName: guestName || undefined,
+      fullName: fullName || undefined,
+      notifyBeforeReservation,
     });
   }
 
@@ -363,24 +366,22 @@ export default function BookCourt() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {!isAuthenticated && (
-                    <div className="space-y-2">
-                      <Label htmlFor="guestName">Your Name (optional)</Label>
-                      <Input
-                        id="guestName"
-                        type="text"
-                        placeholder="John Doe"
-                        value={guestName}
-                        onChange={(e) => setGuestName(e.target.value)}
-                      />
-                    </div>
-                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="fullName">Full Name</Label>
+                    <Input
+                      id="fullName"
+                      type="text"
+                      placeholder="John Doe"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                    />
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="phone">Phone Number *</Label>
                     <Input
                       id="phone"
                       type="tel"
-                      placeholder="(555) 123-4567"
+                      placeholder="(631) 555-1234"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                     />
@@ -394,6 +395,16 @@ export default function BookCourt() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                     />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="notify"
+                      checked={notifyBeforeReservation}
+                      onCheckedChange={(checked) => setNotifyBeforeReservation(checked === true)}
+                    />
+                    <Label htmlFor="notify" className="text-sm font-normal cursor-pointer">
+                      Notify me as my reservation approaches
+                    </Label>
                   </div>
                   <Button
                     className="w-full"
@@ -424,8 +435,10 @@ export default function BookCourt() {
             <div className="flex justify-between"><span className="text-muted-foreground">Time</span><span className="font-medium">{selectedStartTime && formatTimeDisplay(selectedStartTime)} – {selectedEndTime && formatTimeDisplay(selectedEndTime)}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Duration</span><span className="font-medium">{durationLabel} ({selectedIndices.length} slot{selectedIndices.length > 1 ? "s" : ""})</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Price</span><span className="font-semibold">${priceDisplay}</span></div>
+            {fullName && <div className="flex justify-between"><span className="text-muted-foreground">Name</span><span className="font-medium">{fullName}</span></div>}
             <div className="flex justify-between"><span className="text-muted-foreground">Phone</span><span className="font-medium">{phone}</span></div>
             {email && <div className="flex justify-between"><span className="text-muted-foreground">Email</span><span className="font-medium">{email}</span></div>}
+            <div className="flex justify-between"><span className="text-muted-foreground">Notifications</span><span className="font-medium">{notifyBeforeReservation ? "Yes" : "No"}</span></div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowConfirmDialog(false)}>Cancel</Button>

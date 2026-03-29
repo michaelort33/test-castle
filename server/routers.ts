@@ -44,6 +44,8 @@ const reservationRouter = router({
       contactPhone: z.string().min(1, "Phone number is required"),
       contactEmail: z.string().email().optional().or(z.literal("")),
       guestName: z.string().optional(),
+      fullName: z.string().optional(),
+      notifyBeforeReservation: z.boolean().optional().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
 
@@ -90,8 +92,10 @@ const reservationRouter = router({
         endTime,
         duration: input.duration,
         price,
+        fullName: input.fullName || input.guestName || null,
         contactPhone: input.contactPhone,
         contactEmail: input.contactEmail || null,
+        notifyBeforeReservation: input.notifyBeforeReservation ?? true,
         confirmationCode,
         status: "confirmed",
       });

@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
 import { getLoginUrl } from "@/const";
-import { toSafeDate, formatDate } from "@/lib/dates";
+import { toSafeDate, formatDate, formatTimeDisplay } from "@/lib/dates";
 import { CalendarDays, Trophy, Clock, ArrowRight, Castle, LogOut, X } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -148,10 +148,10 @@ export default function Dashboard() {
                           </div>
                         </div>
                         <div>
-                          <p className="font-medium">{res.startTime} - {res.endTime}</p>
+                          <p className="font-medium">{formatTimeDisplay(res.startTime)} - {formatTimeDisplay(res.endTime)}</p>
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="text-sm text-muted-foreground">
-                              {res.duration >= 60 ? `${Math.floor(res.duration / 60)}h${res.duration % 60 > 0 ? ` ${res.duration % 60}m` : ""}` : `${res.duration}m`} &middot; ${(res.price / 100).toFixed(0)}
+                              {(res as any).fullName && `${(res as any).fullName} · `}{res.duration >= 60 ? `${Math.floor(res.duration / 60)}h${res.duration % 60 > 0 ? ` ${res.duration % 60}m` : ""}` : `${res.duration}m`} &middot; ${(res.price / 100).toFixed(0)}
                             </span>
                             {res.sessionName && (
                               <Badge variant="secondary" className="text-xs">{res.sessionName}</Badge>
@@ -201,7 +201,7 @@ export default function Dashboard() {
                           </div>
                         </div>
                         <div>
-                          <p className="font-medium">{res.startTime} - {res.endTime}</p>
+                          <p className="font-medium">{formatTimeDisplay(res.startTime)} - {formatTimeDisplay(res.endTime)}</p>
                           <span className="text-sm text-muted-foreground">
                             {res.duration} min
                           </span>

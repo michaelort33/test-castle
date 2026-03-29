@@ -59,7 +59,7 @@ describe("reservation.create", () => {
     const caller = appRouter.createCaller(makeCtx(user));
     // Use a unique date+time to avoid conflicts from prior test runs
     const result = await caller.reservation.create({
-      date: "2026-07-10",
+      date: "2027-01-10",
       startTime: "06:00",
       duration: 60,
       contactPhone: "5551234567",
@@ -71,7 +71,7 @@ describe("reservation.create", () => {
     const caller = appRouter.createCaller(makeCtx());
 
     const result = await caller.reservation.create({
-      date: "2026-07-11",
+      date: "2027-01-11",
       startTime: "14:00",
       duration: 60,
       contactPhone: "5559876543",
@@ -97,7 +97,7 @@ describe("reservation.create", () => {
   it("accepts 30-minute single slot booking", async () => {
     const caller = appRouter.createCaller(makeCtx());
     const result = await caller.reservation.create({
-      date: "2026-08-01",
+      date: "2027-02-01",
       startTime: "08:00",
       duration: 30,
       contactPhone: "5551111111",
@@ -110,7 +110,7 @@ describe("reservation.create", () => {
   it("accepts 90-minute multi-slot booking with correct price", async () => {
     const caller = appRouter.createCaller(makeCtx());
     const result = await caller.reservation.create({
-      date: "2026-08-02",
+      date: "2027-02-02",
       startTime: "09:00",
       duration: 90,
       contactPhone: "5552222222",
@@ -123,7 +123,7 @@ describe("reservation.create", () => {
   it("applies 2-hour discount ($90 instead of $100)", async () => {
     const caller = appRouter.createCaller(makeCtx());
     const result = await caller.reservation.create({
-      date: "2026-08-03",
+      date: "2027-02-03",
       startTime: "12:00",
       duration: 120,
       contactPhone: "5553333333",

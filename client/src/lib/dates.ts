@@ -25,3 +25,14 @@ export function toDateString(d: Date): string {
   const day = String(d.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
+
+/**
+ * Format a 24-hour time string ("HH:MM") to 12-hour AM/PM format.
+ * Uses the client's local timezone context.
+ */
+export function formatTimeDisplay(t: string): string {
+  const [h, m] = t.split(":").map(Number);
+  const ampm = h >= 12 ? "PM" : "AM";
+  const hour = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${hour}:${String(m).padStart(2, "0")} ${ampm}`;
+}

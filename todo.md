@@ -76,3 +76,12 @@
 - [x] Admin display: show multi-slot reservations properly with full time range
 - [x] Dashboard display: show multi-slot reservations properly
 - [x] Update tests for flexible duration validation
+
+## UX Updates (Round 4- [x] Switch all time displays from 24-hour (military) to 12-hour AM/PM format
+- [x] Use client browser timezone for all time displays
+- [x] Add facility address (168 Broadhollow Road, Farmingdale, NY 11735) and phone (631-390-9661) to landing page
+- [x] Add "Full Name" field (single field) to the booking form
+- [x] Add notification opt-in checkbox to booking form (default: checked/yes)
+- [x] Update backend reservation schema to store fullName and notifyBeforeReservation
+- [x] Update Admin reservation display to show full name and notification preference
+- [x] Update Dashboard reservation display to show full name

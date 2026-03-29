@@ -85,3 +85,6 @@
 - [x] Update backend reservation schema to store fullName and notifyBeforeReservation
 - [x] Update Admin reservation display to show full name and notification preference
 - [x] Update Dashboard reservation display to show full name
+
+## UX Fixes (Round 5)
+- [x] Make booked time slots more visually distinct (stronger color, strikethrough, or "Booked" label)

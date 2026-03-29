@@ -308,15 +308,18 @@ export default function BookCourt() {
                               ? `bg-primary text-primary-foreground border-primary shadow-sm ${isFirst ? "rounded-l-md" : ""} ${isLast ? "rounded-r-md" : ""} ${!isFirst && !isLast ? "rounded-none" : ""} ${isFirst && isLast ? "rounded-md" : ""}`
                               : booked
                                 ? sessionName
-                                  ? "bg-amber-50 border-amber-200 text-amber-700 cursor-not-allowed rounded-md"
-                                  : "bg-muted/50 border-transparent text-muted-foreground cursor-not-allowed rounded-md"
+                                  ? "bg-amber-100 border-amber-300 text-amber-800 cursor-not-allowed rounded-md"
+                                  : "bg-red-50 border-red-200 text-red-400 cursor-not-allowed rounded-md line-through"
                                 : "bg-card hover:bg-accent border-border rounded-md cursor-pointer"
                             }
                           `}
                         >
                           <span className="block">{formatTimeDisplay(slot)}</span>
+                          {booked && !sessionName && (
+                            <span className="block text-[10px] font-semibold mt-0.5 text-red-400">Booked</span>
+                          )}
                           {sessionName && (
-                            <span className="block text-[10px] truncate mt-0.5 opacity-80">{sessionName}</span>
+                            <span className="block text-[10px] truncate mt-0.5 font-semibold">{sessionName}</span>
                           )}
                           {isSelected && isFirst && selectedIndices.length > 1 && (
                             <span className="absolute -bottom-5 left-0 text-[10px] text-primary font-medium whitespace-nowrap">
@@ -345,11 +348,11 @@ export default function BookCourt() {
                     <span>Selected</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 rounded-sm bg-muted/50" />
+                    <div className="w-3 h-3 rounded-sm bg-red-50 border border-red-200" />
                     <span>Booked</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 rounded-sm bg-amber-50 border border-amber-200" />
+                    <div className="w-3 h-3 rounded-sm bg-amber-100 border border-amber-300" />
                     <span>Session</span>
                   </div>
                 </div>

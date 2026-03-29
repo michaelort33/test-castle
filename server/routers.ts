@@ -17,6 +17,10 @@ import {
   registerForTournament, getTournamentRegistrations,
   getUserTournamentRegistrations, unregisterFromTournament,
   getAdminStats, getUserById,
+  createOpenPlaySession, getOpenPlaySessionsByDate, getAllOpenPlaySessions,
+  getOpenPlaySessionById, cancelOpenPlaySession, updateOpenPlaySession,
+  getOpenPlaySignups, getOpenPlaySignupCount,
+  joinOpenPlaySession, leaveOpenPlaySession, adminCancelOpenPlaySignup,
 } from "./db";
 import { notifyOwner } from "./_core/notification";
 
@@ -284,6 +288,152 @@ const tournamentRouter = router({
     }),
 });
 
+// ─── Open Play Router ──────────────────────────────────────
+
+const openPlayRouter = router({
+  // Public: get open play sessions for a date
+  getByDate: publicProcedure
+    .input(z.object({ date: z.string() }))
+    .query(async ({ input }) => {
+      const sessions = await getOpenPlaySessionsByDate(input.date);
+      // Enrich with signup counts
+      const enriched = await Promise.all(sessions.map(async (s) => {
+        const counts = await getOpenPlaySignupCount(s.id);
+        const signups = await getOpenPlaySignups(s.id);
+        return { ...s, confirmedCount: counts.confirmed, waitlistedCount: counts.waitlisted, signups };
+      }));
+      return enriched;
+    }),
+
+  // Public: get a single session with full details
+  getById: publicProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ input }) => {
+      const session = await getOpenPlaySessionById(input.id);
+      if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found" });
+      const counts = await getOpenPlaySignupCount(session.id);
+      const signups = await getOpenPlaySignups(session.id);
+      return { ...session, confirmedCount: counts.confirmed, waitlistedCount: counts.waitlisted, signups };
+    }),
+
+  // Public: join an open play session
+  join: publicProcedure
+    .input(z.object({
+      sessionId: z.number(),
+      playerName: z.string().min(1, "Name is required"),
+      phone: z.string().min(1, "Phone number is required"),
+      email: z.string().email().optional().or(z.literal("")),
+    }))
+    .mutation(async ({ input }) => {
+      const result = await joinOpenPlaySession(
+        input.sessionId,
+        input.playerName,
+        input.phone,
+        input.email || undefined,
+      );
+      return result;
+    }),
+
+  // Public: leave an open play session
+  leave: publicProcedure
+    .input(z.object({
+      signupId: z.number(),
+      phone: z.string().min(1, "Phone required to verify identity"),
+    }))
+    .mutation(async ({ input }) => {
+      await leaveOpenPlaySession(input.signupId, input.phone);
+      return { success: true };
+    }),
+
+  // Admin: create open play session
+  create: adminProcedure
+    .input(z.object({
+      date: z.string(),
+      startTime: z.string(),
+      endTime: z.string(),
+      title: z.string().min(1),
+      description: z.string().optional(),
+      maxPlayers: z.number().min(1),
+    }))
+    .mutation(async ({ input }) => {
+      // Check for reservation conflicts
+      const existing = await getReservationsByDate(input.date);
+      const [sh, sm] = input.startTime.split(":").map(Number);
+      const [eh, em] = input.endTime.split(":").map(Number);
+      const startMins = sh * 60 + sm;
+      const endMins = eh * 60 + em;
+      for (const res of existing) {
+        const [rsh, rsm] = res.startTime.split(":").map(Number);
+        const [reh, rem] = res.endTime.split(":").map(Number);
+        const resStart = rsh * 60 + rsm;
+        const resEnd = reh * 60 + rem;
+        if (startMins < resEnd && endMins > resStart) {
+          throw new TRPCError({ code: "CONFLICT", message: "This time conflicts with an existing reservation." });
+        }
+      }
+      const id = await createOpenPlaySession({
+        date: new Date(input.date + "T00:00:00"),
+        startTime: input.startTime,
+        endTime: input.endTime,
+        title: input.title,
+        description: input.description ?? null,
+        maxPlayers: input.maxPlayers,
+        status: "active",
+      });
+      return { id };
+    }),
+
+  // Admin: list all open play sessions with signups
+  listAll: adminProcedure.query(async () => {
+    const sessions = await getAllOpenPlaySessions();
+    const enriched = await Promise.all(sessions.map(async (s) => {
+      const counts = await getOpenPlaySignupCount(s.id);
+      const signups = await getOpenPlaySignups(s.id);
+      return { ...s, confirmedCount: counts.confirmed, waitlistedCount: counts.waitlisted, signups };
+    }));
+    return enriched;
+  }),
+
+  // Admin: cancel session
+  cancel: adminProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      await cancelOpenPlaySession(input.id);
+      return { success: true };
+    }),
+
+  // Admin: update session details
+  update: adminProcedure
+    .input(z.object({
+      id: z.number(),
+      title: z.string().min(1).optional(),
+      description: z.string().optional(),
+      maxPlayers: z.number().min(1).optional(),
+      startTime: z.string().optional(),
+      endTime: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { id, ...data } = input;
+      await updateOpenPlaySession(id, data);
+      return { success: true };
+    }),
+
+  // Admin: remove a player from a session
+  removePlayer: adminProcedure
+    .input(z.object({ signupId: z.number() }))
+    .mutation(async ({ input }) => {
+      await adminCancelOpenPlaySignup(input.signupId);
+      return { success: true };
+    }),
+
+  // Admin: get signups for a session
+  signups: adminProcedure
+    .input(z.object({ sessionId: z.number() }))
+    .query(async ({ input }) => {
+      return getOpenPlaySignups(input.sessionId);
+    }),
+});
+
 // ─── User Profile Router ────────────────────────────────────────
 
 const profileRouter = router({
@@ -310,6 +460,7 @@ export const appRouter = router({
   reservation: reservationRouter,
   admin: adminRouter,
   tournament: tournamentRouter,
+  openPlay: openPlayRouter,
   profile: profileRouter,
   leaderboard: leaderboardRouter,
 });

@@ -59,7 +59,7 @@ describe("reservation.create", () => {
     const caller = appRouter.createCaller(makeCtx(user));
     // Use a unique date+time to avoid conflicts from prior test runs
     const result = await caller.reservation.create({
-      date: "2027-01-10",
+      date: "2029-06-10",
       startTime: "06:00",
       duration: 60,
       contactPhone: "5551234567",
@@ -71,7 +71,7 @@ describe("reservation.create", () => {
     const caller = appRouter.createCaller(makeCtx());
 
     const result = await caller.reservation.create({
-      date: "2027-01-11",
+      date: "2029-06-11",
       startTime: "14:00",
       duration: 60,
       contactPhone: "5559876543",
@@ -97,7 +97,7 @@ describe("reservation.create", () => {
   it("accepts 30-minute single slot booking", async () => {
     const caller = appRouter.createCaller(makeCtx());
     const result = await caller.reservation.create({
-      date: "2027-02-01",
+      date: "2029-07-01",
       startTime: "08:00",
       duration: 30,
       contactPhone: "5551111111",
@@ -110,7 +110,7 @@ describe("reservation.create", () => {
   it("accepts 90-minute multi-slot booking with correct price", async () => {
     const caller = appRouter.createCaller(makeCtx());
     const result = await caller.reservation.create({
-      date: "2027-02-02",
+      date: "2029-07-02",
       startTime: "09:00",
       duration: 90,
       contactPhone: "5552222222",
@@ -123,7 +123,7 @@ describe("reservation.create", () => {
   it("applies 2-hour discount ($90 instead of $100)", async () => {
     const caller = appRouter.createCaller(makeCtx());
     const result = await caller.reservation.create({
-      date: "2027-02-03",
+      date: "2029-07-03",
       startTime: "12:00",
       duration: 120,
       contactPhone: "5553333333",
@@ -263,6 +263,126 @@ describe("leaderboard", () => {
     const caller = appRouter.createCaller(makeCtx());
     const result = await caller.leaderboard.get();
     expect(Array.isArray(result)).toBe(true);
+  });
+});
+
+// ─── Open Play Tests ────────────────────────────────────────────
+
+describe("openPlay procedures", () => {
+  it("allows public access to get open play sessions by date", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.openPlay.getByDate({ date: "2027-06-01" });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("allows anonymous user to join an open play session", async () => {
+    // First create a session as admin
+    const admin = makeUser({ role: "admin" });
+    const adminCaller = appRouter.createCaller(makeCtx(admin));
+    const session = await adminCaller.openPlay.create({
+      date: "2027-07-15",
+      startTime: "09:00",
+      endTime: "11:00",
+      title: "Test Open Play",
+      maxPlayers: 2,
+    });
+    expect(session.id).toBeTruthy();
+
+    // Join as anonymous
+    const publicCaller = appRouter.createCaller(makeCtx());
+    const join1 = await publicCaller.openPlay.join({
+      sessionId: session.id,
+      playerName: "Player One",
+      phone: "5551111111",
+    });
+    expect(join1.status).toBe("confirmed");
+
+    // Join second player
+    const join2 = await publicCaller.openPlay.join({
+      sessionId: session.id,
+      playerName: "Player Two",
+      phone: "5552222222",
+    });
+    expect(join2.status).toBe("confirmed");
+
+    // Third player should be waitlisted (maxPlayers = 2)
+    const join3 = await publicCaller.openPlay.join({
+      sessionId: session.id,
+      playerName: "Player Three",
+      phone: "5553333333",
+    });
+    expect(join3.status).toBe("waitlisted");
+  });
+
+  it("rejects non-admin from creating open play sessions", async () => {
+    const user = makeUser({ role: "guest" });
+    const caller = appRouter.createCaller(makeCtx(user));
+
+    await expect(
+      caller.openPlay.create({
+        date: "2027-07-20",
+        startTime: "09:00",
+        endTime: "11:00",
+        title: "Test",
+        maxPlayers: 10,
+      })
+    ).rejects.toThrow();
+  });
+
+  it("rejects non-admin from cancelling open play sessions", async () => {
+    const user = makeUser({ role: "guest" });
+    const caller = appRouter.createCaller(makeCtx(user));
+
+    await expect(
+      caller.openPlay.cancel({ id: 1 })
+    ).rejects.toThrow();
+  });
+
+  it("rejects non-admin from removing players", async () => {
+    const user = makeUser({ role: "guest" });
+    const caller = appRouter.createCaller(makeCtx(user));
+
+    await expect(
+      caller.openPlay.removePlayer({ signupId: 1 })
+    ).rejects.toThrow();
+  });
+
+  it("rejects non-admin from updating open play sessions", async () => {
+    const user = makeUser({ role: "guest" });
+    const caller = appRouter.createCaller(makeCtx(user));
+
+    await expect(
+      caller.openPlay.update({ id: 1, title: "Updated" })
+    ).rejects.toThrow();
+  });
+
+  it("allows anonymous user to leave an open play session", async () => {
+    // Create session as admin
+    const admin = makeUser({ role: "admin" });
+    const adminCaller = appRouter.createCaller(makeCtx(admin));
+    const session = await adminCaller.openPlay.create({
+      date: "2027-08-01",
+      startTime: "10:00",
+      endTime: "12:00",
+      title: "Leave Test",
+      maxPlayers: 10,
+    });
+
+    // Join
+    const publicCaller = appRouter.createCaller(makeCtx());
+    const join = await publicCaller.openPlay.join({
+      sessionId: session.id,
+      playerName: "Leaver",
+      phone: "5554444444",
+    });
+    expect(join.status).toBe("confirmed");
+
+    // Leave
+    const result = await publicCaller.openPlay.leave({
+      signupId: join.id,
+      phone: "5554444444",
+    });
+    expect(result.success).toBe(true);
   });
 });
 

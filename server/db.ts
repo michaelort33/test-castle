@@ -5,6 +5,8 @@ import {
   reservations, InsertReservation, Reservation,
   tournaments, InsertTournament, Tournament,
   tournamentRegistrations, InsertTournamentRegistration,
+  openPlaySessions, InsertOpenPlaySession, OpenPlaySession,
+  openPlaySignups, InsertOpenPlaySignup, OpenPlaySignup,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -303,6 +305,171 @@ export async function unregisterFromTournament(tournamentId: number, userId: num
       eq(tournamentRegistrations.tournamentId, tournamentId),
       eq(tournamentRegistrations.userId, userId)
     ));
+}
+
+// ─── OPEN PLAY HELPERS ─────────────────────────────────────────
+
+export async function createOpenPlaySession(data: InsertOpenPlaySession) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(openPlaySessions).values(data);
+  return result[0].insertId;
+}
+
+export async function getOpenPlaySessionsByDate(date: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(openPlaySessions)
+    .where(and(sql`${openPlaySessions.date} = ${date}`, eq(openPlaySessions.status, "active")))
+    .orderBy(asc(openPlaySessions.startTime));
+}
+
+export async function getAllOpenPlaySessions(limit = 100) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(openPlaySessions)
+    .orderBy(desc(openPlaySessions.date), desc(openPlaySessions.startTime))
+    .limit(limit);
+}
+
+export async function getOpenPlaySessionById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(openPlaySessions).where(eq(openPlaySessions.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function cancelOpenPlaySession(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(openPlaySessions).set({ status: "cancelled" }).where(eq(openPlaySessions.id, id));
+}
+
+export async function updateOpenPlaySession(id: number, data: Partial<Pick<InsertOpenPlaySession, "title" | "description" | "maxPlayers" | "startTime" | "endTime" | "date">>) {
+  const db = await getDb();
+  if (!db) return;
+  const updateSet: Record<string, unknown> = {};
+  if (data.title !== undefined) updateSet.title = data.title;
+  if (data.description !== undefined) updateSet.description = data.description;
+  if (data.maxPlayers !== undefined) updateSet.maxPlayers = data.maxPlayers;
+  if (data.startTime !== undefined) updateSet.startTime = data.startTime;
+  if (data.endTime !== undefined) updateSet.endTime = data.endTime;
+  if (data.date !== undefined) updateSet.date = data.date;
+  if (Object.keys(updateSet).length === 0) return;
+  await db.update(openPlaySessions).set(updateSet).where(eq(openPlaySessions.id, id));
+}
+
+export async function getOpenPlaySignups(sessionId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(openPlaySignups)
+    .where(and(eq(openPlaySignups.sessionId, sessionId), sql`${openPlaySignups.status} != 'cancelled'`))
+    .orderBy(asc(openPlaySignups.position));
+}
+
+export async function getOpenPlaySignupCount(sessionId: number) {
+  const db = await getDb();
+  if (!db) return { confirmed: 0, waitlisted: 0 };
+  const [confirmed] = await db.select({ count: sql<number>`count(*)` }).from(openPlaySignups)
+    .where(and(eq(openPlaySignups.sessionId, sessionId), eq(openPlaySignups.status, "confirmed")));
+  const [waitlisted] = await db.select({ count: sql<number>`count(*)` }).from(openPlaySignups)
+    .where(and(eq(openPlaySignups.sessionId, sessionId), eq(openPlaySignups.status, "waitlisted")));
+  return { confirmed: Number(confirmed.count), waitlisted: Number(waitlisted.count) };
+}
+
+export async function joinOpenPlaySession(sessionId: number, playerName: string, phone: string, email?: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Check if already signed up with same phone
+  const existing = await db.select().from(openPlaySignups)
+    .where(and(
+      eq(openPlaySignups.sessionId, sessionId),
+      eq(openPlaySignups.phone, phone),
+      sql`${openPlaySignups.status} != 'cancelled'`
+    )).limit(1);
+  if (existing.length > 0) throw new Error("Already signed up for this session");
+
+  // Get session to check max players
+  const session = await getOpenPlaySessionById(sessionId);
+  if (!session) throw new Error("Session not found");
+  if (session.status === "cancelled") throw new Error("Session is cancelled");
+
+  const counts = await getOpenPlaySignupCount(sessionId);
+  
+  // Get next position
+  const [maxPos] = await db.select({ maxPosition: sql<number>`COALESCE(MAX(position), 0)` })
+    .from(openPlaySignups)
+    .where(and(eq(openPlaySignups.sessionId, sessionId), sql`${openPlaySignups.status} != 'cancelled'`));
+  const nextPosition = Number(maxPos.maxPosition) + 1;
+
+  const status = counts.confirmed < session.maxPlayers ? "confirmed" : "waitlisted";
+
+  const result = await db.insert(openPlaySignups).values({
+    sessionId,
+    playerName,
+    phone,
+    email: email || null,
+    status,
+    position: nextPosition,
+  });
+
+  return { id: result[0].insertId, status, position: nextPosition, waitlistPosition: status === "waitlisted" ? nextPosition - session.maxPlayers : null };
+}
+
+export async function leaveOpenPlaySession(signupId: number, phone: string) {
+  const db = await getDb();
+  if (!db) return;
+
+  // Get the signup to find session and check ownership
+  const [signup] = await db.select().from(openPlaySignups).where(eq(openPlaySignups.id, signupId)).limit(1);
+  if (!signup || signup.phone !== phone) throw new Error("Signup not found or unauthorized");
+  if (signup.status === "cancelled") return;
+
+  const wasConfirmed = signup.status === "confirmed";
+  await db.update(openPlaySignups).set({ status: "cancelled" }).where(eq(openPlaySignups.id, signupId));
+
+  // If the person who left was confirmed, promote the first waitlisted person
+  if (wasConfirmed) {
+    const waitlisted = await db.select().from(openPlaySignups)
+      .where(and(
+        eq(openPlaySignups.sessionId, signup.sessionId),
+        eq(openPlaySignups.status, "waitlisted")
+      ))
+      .orderBy(asc(openPlaySignups.position))
+      .limit(1);
+    if (waitlisted.length > 0) {
+      await db.update(openPlaySignups)
+        .set({ status: "confirmed" })
+        .where(eq(openPlaySignups.id, waitlisted[0].id));
+    }
+  }
+}
+
+export async function adminCancelOpenPlaySignup(signupId: number) {
+  const db = await getDb();
+  if (!db) return;
+
+  const [signup] = await db.select().from(openPlaySignups).where(eq(openPlaySignups.id, signupId)).limit(1);
+  if (!signup || signup.status === "cancelled") return;
+
+  const wasConfirmed = signup.status === "confirmed";
+  await db.update(openPlaySignups).set({ status: "cancelled" }).where(eq(openPlaySignups.id, signupId));
+
+  if (wasConfirmed) {
+    const waitlisted = await db.select().from(openPlaySignups)
+      .where(and(
+        eq(openPlaySignups.sessionId, signup.sessionId),
+        eq(openPlaySignups.status, "waitlisted")
+      ))
+      .orderBy(asc(openPlaySignups.position))
+      .limit(1);
+    if (waitlisted.length > 0) {
+      await db.update(openPlaySignups)
+        .set({ status: "confirmed" })
+        .where(eq(openPlaySignups.id, waitlisted[0].id));
+    }
+  }
 }
 
 // ─── STATS ──────────────────────────────────────────────────────

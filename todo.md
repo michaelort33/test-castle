@@ -94,3 +94,33 @@
 
 ## UX Fixes (Round 7)
 - [x] Change time slots from current range to 5:00 AM - 11:00 PM (30-min intervals)
+
+## Open Play Sessions (Round 8)
+
+### Database
+- [x] Create open_play_sessions table (id, date, startTime, endTime, title, maxPlayers, description, status, createdAt)
+- [x] Create open_play_signups table (id, sessionId, playerName, phone, email, status: confirmed/waitlisted, position, createdAt)
+
+### Backend API
+- [x] Admin: create open play session with date, time range, max players, title
+- [x] Admin: list/edit/cancel open play sessions
+- [x] Public: list open play sessions for a given date
+- [x] Public: join open play session (name + phone required) — auto-waitlist if full
+- [x] Public: leave/cancel signup from open play session — auto-promote waitlisted player
+- [x] Public: view player list and waitlist for a session
+
+### Frontend
+- [x] Admin: open play session creation form in admin dashboard
+- [x] Admin: manage open play sessions (view signups, cancel sessions)
+- [x] Booking page: show open play sessions as special blocks in the time grid
+- [x] Open play detail view: show player names, spots remaining, join button
+- [x] Waitlist UI: show position when user is waitlisted
+- [x] Open play sessions visible on booking calendar as distinct styled blocks
+
+### Integration
+- [x] Open play time slots block regular bookings for those times
+- [x] Write tests for open play join/leave/waitlist logic
+
+### Gaps to Address
+- [x] Add open play edit/update endpoint and UI
+- [x] Add automated tests for open play join/waitlist/leave/promote

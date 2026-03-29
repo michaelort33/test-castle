@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { trpc } from "@/lib/trpc";
-import { Castle, LogOut, ArrowLeft, Check, GripVertical, ArrowDown } from "lucide-react";
+import { Castle, LogOut, ArrowLeft, Check, GripVertical, ArrowDown, Users, Clock, UserPlus } from "lucide-react";
 import { useLocation } from "wouter";
 import { useState, useMemo, useCallback, useRef } from "react";
 import { toast } from "sonner";
@@ -54,6 +54,26 @@ function calculatePrice(durationMins: number): number {
   return 9000 + (slots - 4) * 2500; // Beyond 2hr: $90 base + $25/extra slot
 }
 
+type OpenPlaySessionData = {
+  id: number;
+  date: string | Date;
+  startTime: string;
+  endTime: string;
+  title: string;
+  description: string | null;
+  maxPlayers: number;
+  status: string;
+  confirmedCount: number;
+  waitlistedCount: number;
+  signups: Array<{
+    id: number;
+    playerName: string;
+    phone: string;
+    status: string;
+    position: number;
+  }>;
+};
+
 export default function BookCourt() {
   const { user, isAuthenticated, logout } = useAuth();
   const [, setLocation] = useLocation();
@@ -70,6 +90,13 @@ export default function BookCourt() {
   const [isDragging, setIsDragging] = useState(false);
   const dragStartIndex = useRef<number | null>(null);
   const bookingFormRef = useRef<HTMLDivElement>(null);
+
+  // Open Play join dialog state
+  const [openPlayDialog, setOpenPlayDialog] = useState<OpenPlaySessionData | null>(null);
+  const [opName, setOpName] = useState("");
+  const [opPhone, setOpPhone] = useState(user?.phone || "");
+  const [opEmail, setOpEmail] = useState("");
+  const [joinResult, setJoinResult] = useState<{ status: string; waitlistPosition: number | null } | null>(null);
 
   const scrollToForm = () => {
     bookingFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -92,6 +119,10 @@ export default function BookCourt() {
     { date: dateStr },
   );
 
+  const { data: openPlaySessions } = trpc.openPlay.getByDate.useQuery(
+    { date: dateStr },
+  );
+
   const createMutation = trpc.reservation.create.useMutation({
     onSuccess: (data) => {
       setConfirmationResult(data);
@@ -103,21 +134,54 @@ export default function BookCourt() {
     onError: (err) => toast.error(err.message),
   });
 
-  // Calculate which slots are booked
+  const joinMutation = trpc.openPlay.join.useMutation({
+    onSuccess: (data) => {
+      setJoinResult(data);
+      utils.openPlay.getByDate.invalidate({ date: dateStr });
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  // Calculate which slots are booked (reservations + open play sessions)
   const bookedRanges = useMemo(() => {
-    if (!dayReservations) return [];
-    return dayReservations.map((r) => ({
-      start: timeToMinutes(r.startTime),
-      end: timeToMinutes(r.endTime),
-      sessionName: r.sessionName,
-    }));
-  }, [dayReservations]);
+    const ranges: Array<{ start: number; end: number; sessionName: string | null; isOpenPlay?: boolean; openPlaySession?: OpenPlaySessionData }> = [];
+    if (dayReservations) {
+      for (const r of dayReservations) {
+        ranges.push({
+          start: timeToMinutes(r.startTime),
+          end: timeToMinutes(r.endTime),
+          sessionName: r.sessionName,
+        });
+      }
+    }
+    if (openPlaySessions) {
+      for (const s of openPlaySessions) {
+        ranges.push({
+          start: timeToMinutes(s.startTime),
+          end: timeToMinutes(s.endTime),
+          sessionName: s.title,
+          isOpenPlay: true,
+          openPlaySession: s as OpenPlaySessionData,
+        });
+      }
+    }
+    return ranges;
+  }, [dayReservations, openPlaySessions]);
 
   const isSlotBooked = useCallback(
     (slotIndex: number) => {
       const slotStart = timeToMinutes(TIME_SLOTS[slotIndex]);
       const slotEnd = slotStart + 30;
-      return bookedRanges.some((r) => slotStart < r.end && slotEnd > r.start);
+      return bookedRanges.some((r) => !r.isOpenPlay && slotStart < r.end && slotEnd > r.start);
+    },
+    [bookedRanges]
+  );
+
+  const isSlotOpenPlay = useCallback(
+    (slotIndex: number) => {
+      const slotStart = timeToMinutes(TIME_SLOTS[slotIndex]);
+      const slotEnd = slotStart + 30;
+      return bookedRanges.find((r) => r.isOpenPlay && slotStart < r.end && slotEnd > r.start);
     },
     [bookedRanges]
   );
@@ -125,36 +189,41 @@ export default function BookCourt() {
   function getSlotSessionName(slotIndex: number): string | null {
     const slotStart = timeToMinutes(TIME_SLOTS[slotIndex]);
     const slotEnd = slotStart + 30;
-    const conflict = bookedRanges.find((r) => slotStart < r.end && slotEnd > r.start);
+    const conflict = bookedRanges.find((r) => !r.isOpenPlay && slotStart < r.end && slotEnd > r.start);
     return conflict?.sessionName ?? null;
   }
 
-  // Build contiguous selection between start and current, stopping at booked slots
+  // Build contiguous selection between start and current, stopping at booked or open play slots
   const buildContiguousSelection = useCallback(
     (startIdx: number, currentIdx: number): number[] => {
       const minIdx = Math.min(startIdx, currentIdx);
       const maxIdx = Math.max(startIdx, currentIdx);
       const result: number[] = [];
 
-      // Walk from startIdx toward currentIdx, stopping at any booked slot
       if (currentIdx >= startIdx) {
         for (let i = startIdx; i <= maxIdx; i++) {
-          if (isSlotBooked(i)) break;
+          if (isSlotBooked(i) || isSlotOpenPlay(i)) break;
           result.push(i);
         }
       } else {
         for (let i = startIdx; i >= minIdx; i--) {
-          if (isSlotBooked(i)) break;
+          if (isSlotBooked(i) || isSlotOpenPlay(i)) break;
           result.push(i);
         }
         result.sort((a, b) => a - b);
       }
       return result;
     },
-    [isSlotBooked]
+    [isSlotBooked, isSlotOpenPlay]
   );
 
   const handleSlotPointerDown = (index: number) => {
+    // Check if this is an open play slot
+    const opMatch = isSlotOpenPlay(index);
+    if (opMatch?.openPlaySession) {
+      setOpenPlayDialog(opMatch.openPlaySession);
+      return;
+    }
     if (isSlotBooked(index)) return;
     setIsDragging(true);
     dragStartIndex.current = index;
@@ -192,6 +261,16 @@ export default function BookCourt() {
       contactEmail: email || undefined,
       fullName: fullName || undefined,
       notifyBeforeReservation,
+    });
+  }
+
+  function handleJoinOpenPlay() {
+    if (!openPlayDialog || !opName || !opPhone) return;
+    joinMutation.mutate({
+      sessionId: openPlayDialog.id,
+      playerName: opName,
+      phone: opPhone,
+      email: opEmail || undefined,
     });
   }
 
@@ -233,7 +312,7 @@ export default function BookCourt() {
         <h1 className="text-2xl font-semibold mb-2">Book Court Time</h1>
         <p className="text-muted-foreground mb-6 text-sm flex items-center gap-1.5">
           <GripVertical className="h-4 w-4" />
-          Click and drag across time slots to select your session length
+          Click and drag across time slots to select your session length. Tap green Open Play slots to join.
         </p>
 
         {/* Sticky Book Now bar when slots selected */}
@@ -310,10 +389,30 @@ export default function BookCourt() {
                   >
                     {TIME_SLOTS.map((slot, index) => {
                       const booked = isSlotBooked(index);
+                      const openPlayMatch = isSlotOpenPlay(index);
                       const sessionName = getSlotSessionName(index);
                       const isSelected = selectedIndices.includes(index);
                       const isFirst = selectedIndices.length > 0 && selectedIndices[0] === index;
                       const isLast = selectedIndices.length > 0 && selectedIndices[selectedIndices.length - 1] === index;
+
+                      // Open Play slot styling
+                      if (openPlayMatch) {
+                        const op = openPlayMatch.openPlaySession!;
+                        const spotsLeft = op.maxPlayers - op.confirmedCount;
+                        return (
+                          <button
+                            key={slot}
+                            onClick={() => setOpenPlayDialog(op)}
+                            className="relative p-2.5 text-sm font-medium transition-all border rounded-md bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100 cursor-pointer"
+                          >
+                            <span className="block">{formatTimeDisplay(slot)}</span>
+                            <span className="block text-[10px] truncate mt-0.5 font-semibold">{op.title}</span>
+                            <span className="block text-[9px] mt-0.5">
+                              {spotsLeft > 0 ? `${spotsLeft} spot${spotsLeft !== 1 ? "s" : ""} left` : "Waitlist"}
+                            </span>
+                          </button>
+                        );
+                      }
 
                       return (
                         <button
@@ -360,7 +459,7 @@ export default function BookCourt() {
                 )}
 
                 {/* Legend */}
-                <div className="flex items-center gap-4 mt-8 text-xs text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-4 mt-8 text-xs text-muted-foreground">
                   <div className="flex items-center gap-1.5">
                     <div className="w-3 h-3 rounded-sm bg-card border border-border" />
                     <span>Available</span>
@@ -377,9 +476,71 @@ export default function BookCourt() {
                     <div className="w-3 h-3 rounded-sm bg-amber-100 border border-amber-300" />
                     <span>Session</span>
                   </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-sm bg-emerald-50 border border-emerald-300" />
+                    <span>Open Play</span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
+
+            {/* Open Play Sessions for this date */}
+            {openPlaySessions && openPlaySessions.length > 0 && (
+              <Card className="border-0 shadow-sm border-l-4 border-l-emerald-500">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Users className="h-4 w-4 text-emerald-600" />
+                    Open Play Sessions
+                  </CardTitle>
+                  <CardDescription>Join a group session — tap any session to sign up</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {openPlaySessions.map((session) => {
+                    const spotsLeft = session.maxPlayers - session.confirmedCount;
+                    return (
+                      <div
+                        key={session.id}
+                        className="border rounded-lg p-4 hover:bg-accent/50 cursor-pointer transition-colors"
+                        onClick={() => setOpenPlayDialog(session as OpenPlaySessionData)}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="font-semibold text-sm">{session.title}</h3>
+                          <Badge variant={spotsLeft > 0 ? "default" : "secondary"} className={spotsLeft > 0 ? "bg-emerald-600" : ""}>
+                            {spotsLeft > 0 ? `${spotsLeft} spot${spotsLeft !== 1 ? "s" : ""} left` : "Waitlist Open"}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {formatTimeDisplay(session.startTime)} – {formatTimeDisplay(session.endTime)}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Users className="h-3 w-3" />
+                            {session.confirmedCount}/{session.maxPlayers} players
+                          </span>
+                          {session.waitlistedCount > 0 && (
+                            <span className="text-amber-600">{session.waitlistedCount} waitlisted</span>
+                          )}
+                        </div>
+                        {session.description && (
+                          <p className="text-xs text-muted-foreground mt-1">{session.description}</p>
+                        )}
+                        {/* Player names */}
+                        {session.signups && session.signups.filter((s: any) => s.status === "confirmed").length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {session.signups.filter((s: any) => s.status === "confirmed").map((s: any) => (
+                              <Badge key={s.id} variant="outline" className="text-[10px] font-normal">
+                                {s.playerName}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Booking Form — appears when slots are selected */}
             {selectedIndices.length > 0 && (
@@ -500,6 +661,123 @@ export default function BookCourt() {
           </div>
           <DialogFooter>
             <Button className="w-full" onClick={() => { setConfirmationResult(null); setShowConfirmDialog(false); setSelectedIndices([]); }}>
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Open Play Join Dialog */}
+      <Dialog open={!!openPlayDialog && !joinResult} onOpenChange={(open) => { if (!open) { setOpenPlayDialog(null); setOpName(""); setOpPhone(user?.phone || ""); setOpEmail(""); } }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-emerald-600" />
+              {openPlayDialog?.title}
+            </DialogTitle>
+            <DialogDescription>
+              {format(selectedDate, "EEEE, MMMM d")} &middot; {openPlayDialog && formatTimeDisplay(openPlayDialog.startTime)} – {openPlayDialog && formatTimeDisplay(openPlayDialog.endTime)}
+            </DialogDescription>
+          </DialogHeader>
+
+          {openPlayDialog && (
+            <div className="space-y-4">
+              {openPlayDialog.description && (
+                <p className="text-sm text-muted-foreground">{openPlayDialog.description}</p>
+              )}
+
+              {/* Player list */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-medium">Players ({openPlayDialog.confirmedCount}/{openPlayDialog.maxPlayers})</h4>
+                  {openPlayDialog.confirmedCount >= openPlayDialog.maxPlayers && (
+                    <Badge variant="secondary" className="text-amber-600">Full — Waitlist Available</Badge>
+                  )}
+                </div>
+                {openPlayDialog.signups.filter(s => s.status === "confirmed").length > 0 ? (
+                  <div className="space-y-1">
+                    {openPlayDialog.signups.filter(s => s.status === "confirmed").map((s, i) => (
+                      <div key={s.id} className="flex items-center gap-2 text-sm py-1 px-2 rounded bg-emerald-50">
+                        <span className="w-5 h-5 rounded-full bg-emerald-200 text-emerald-800 flex items-center justify-center text-xs font-bold">{i + 1}</span>
+                        <span>{s.playerName}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">No players yet — be the first to join!</p>
+                )}
+
+                {/* Waitlist */}
+                {openPlayDialog.signups.filter(s => s.status === "waitlisted").length > 0 && (
+                  <div className="mt-2">
+                    <h4 className="text-sm font-medium text-amber-600 mb-1">Waitlist</h4>
+                    {openPlayDialog.signups.filter(s => s.status === "waitlisted").map((s, i) => (
+                      <div key={s.id} className="flex items-center gap-2 text-sm py-1 px-2 rounded bg-amber-50">
+                        <span className="w-5 h-5 rounded-full bg-amber-200 text-amber-800 flex items-center justify-center text-xs font-bold">W{i + 1}</span>
+                        <span>{s.playerName}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Join form */}
+              <div className="border-t pt-4 space-y-3">
+                <h4 className="text-sm font-medium flex items-center gap-1.5">
+                  <UserPlus className="h-4 w-4" />
+                  {openPlayDialog.confirmedCount >= openPlayDialog.maxPlayers ? "Join Waitlist" : "Join Session"}
+                </h4>
+                <div className="space-y-2">
+                  <Label htmlFor="opName">Your Name *</Label>
+                  <Input id="opName" placeholder="John Doe" value={opName} onChange={(e) => setOpName(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="opPhone">Phone Number *</Label>
+                  <Input id="opPhone" type="tel" placeholder="(631) 555-1234" value={opPhone} onChange={(e) => setOpPhone(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="opEmail">Email (optional)</Label>
+                  <Input id="opEmail" type="email" placeholder="you@example.com" value={opEmail} onChange={(e) => setOpEmail(e.target.value)} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setOpenPlayDialog(null); setOpName(""); setOpPhone(user?.phone || ""); setOpEmail(""); }}>Cancel</Button>
+            <Button
+              onClick={handleJoinOpenPlay}
+              disabled={!opName || !opPhone || joinMutation.isPending}
+              className={openPlayDialog && openPlayDialog.confirmedCount >= openPlayDialog.maxPlayers ? "bg-amber-600 hover:bg-amber-700" : "bg-emerald-600 hover:bg-emerald-700"}
+            >
+              {joinMutation.isPending ? "Joining..." : openPlayDialog && openPlayDialog.confirmedCount >= openPlayDialog.maxPlayers ? "Join Waitlist" : "Join Session"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Open Play Join Success Dialog */}
+      <Dialog open={!!joinResult} onOpenChange={() => { setJoinResult(null); setOpenPlayDialog(null); setOpName(""); setOpPhone(user?.phone || ""); setOpEmail(""); }}>
+        <DialogContent>
+          <DialogHeader>
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${joinResult?.status === "confirmed" ? "bg-emerald-100" : "bg-amber-100"}`}>
+              {joinResult?.status === "confirmed"
+                ? <Check className="h-8 w-8 text-emerald-600" />
+                : <Clock className="h-8 w-8 text-amber-600" />
+              }
+            </div>
+            <DialogTitle className="text-center">
+              {joinResult?.status === "confirmed" ? "You're In!" : "Added to Waitlist"}
+            </DialogTitle>
+            <DialogDescription className="text-center">
+              {joinResult?.status === "confirmed"
+                ? `You've been added to ${openPlayDialog?.title}. See you on the court!`
+                : `The session is full. You're #${joinResult?.waitlistPosition} on the waitlist. We'll notify you if a spot opens up.`
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button className="w-full" onClick={() => { setJoinResult(null); setOpenPlayDialog(null); setOpName(""); setOpPhone(user?.phone || ""); setOpEmail(""); }}>
               Done
             </Button>
           </DialogFooter>

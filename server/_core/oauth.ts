@@ -3,6 +3,7 @@ import type { Express, Request, Response } from "express";
 import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
+import { notifyOwner } from "./notification";
 
 function getQueryParam(req: Request, key: string): string | undefined {
   const value = req.query[key];
@@ -28,6 +29,9 @@ export function registerOAuthRoutes(app: Express) {
         return;
       }
 
+      // Check if user already exists (for new user notification)
+      const existingUser = await db.getUserByOpenId(userInfo.openId);
+
       await db.upsertUser({
         openId: userInfo.openId,
         name: userInfo.name || null,
@@ -35,6 +39,14 @@ export function registerOAuthRoutes(app: Express) {
         loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
         lastSignedIn: new Date(),
       });
+
+      // Notify admin of new user signup
+      if (!existingUser) {
+        notifyOwner({
+          title: "New User Signup — The Castle",
+          content: `A new user has signed up and is awaiting approval.\n\nName: ${userInfo.name || "N/A"}\nEmail: ${userInfo.email || "N/A"}\n\nLog in to the admin dashboard to approve or reject this user.`,
+        }).catch(err => console.warn("[Notification] Failed to notify owner of new signup:", err));
+      }
 
       const sessionToken = await sdk.createSessionToken(userInfo.openId, {
         name: userInfo.name || "",

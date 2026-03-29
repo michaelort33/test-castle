@@ -228,7 +228,7 @@ function ReservationsTab() {
                     <div>
                       <p className="font-medium">{r.startTime} - {r.endTime}</p>
                       <p className="text-sm text-muted-foreground">
-                        {userName || "Unknown"} · {r.contactPhone} · <span className="font-mono text-xs">{r.confirmationCode}</span>
+                        {userName || "Unknown"} · {r.contactPhone} · {r.duration >= 60 ? `${Math.floor(r.duration / 60)}h${r.duration % 60 > 0 ? ` ${r.duration % 60}m` : ""}` : `${r.duration}m`} · ${(r.price / 100).toFixed(0)} · <span className="font-mono text-xs">{r.confirmationCode}</span>
                       </p>
                       <div className="flex items-center gap-2 mt-0.5">
                         {r.sessionName && <Badge variant="secondary" className="text-xs">{r.sessionName}</Badge>}

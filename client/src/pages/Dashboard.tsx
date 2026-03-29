@@ -151,7 +151,7 @@ export default function Dashboard() {
                           <p className="font-medium">{res.startTime} - {res.endTime}</p>
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="text-sm text-muted-foreground">
-                              {res.duration} min &middot; ${(res.price / 100).toFixed(0)}
+                              {res.duration >= 60 ? `${Math.floor(res.duration / 60)}h${res.duration % 60 > 0 ? ` ${res.duration % 60}m` : ""}` : `${res.duration}m`} &middot; ${(res.price / 100).toFixed(0)}
                             </span>
                             {res.sessionName && (
                               <Badge variant="secondary" className="text-xs">{res.sessionName}</Badge>

@@ -7,9 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
-import { Castle, LogOut, ArrowLeft, Check, Clock } from "lucide-react";
+import { Castle, LogOut, ArrowLeft, Check, GripVertical } from "lucide-react";
 import { useLocation } from "wouter";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { toDateString } from "@/lib/dates";
 import { format } from "date-fns";
@@ -31,6 +31,28 @@ function timeToMinutes(t: string) {
   return h * 60 + m;
 }
 
+function minutesToTime(mins: number) {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function formatTimeDisplay(t: string) {
+  const [h, m] = t.split(":").map(Number);
+  const ampm = h >= 12 ? "PM" : "AM";
+  const hour = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${hour}:${String(m).padStart(2, "0")} ${ampm}`;
+}
+
+/** Calculate price in cents for a given duration in minutes */
+function calculatePrice(durationMins: number): number {
+  const slots = durationMins / 30;
+  if (slots <= 0) return 0;
+  if (slots === 4) return 9000; // 2hr = $90 (discount)
+  if (durationMins <= 120) return slots * 2500;
+  return 9000 + (slots - 4) * 2500; // Beyond 2hr: $90 base + $25/extra slot
+}
+
 export default function BookCourt() {
   const { user, isAuthenticated, logout } = useAuth();
   const [, setLocation] = useLocation();
@@ -41,17 +63,24 @@ export default function BookCourt() {
     d.setHours(0, 0, 0, 0);
     return d;
   });
-  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
-  const [duration, setDuration] = useState<60 | 120>(60);
+
+  // Drag-select state: track indices into TIME_SLOTS
+  const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartIndex = useRef<number | null>(null);
+
   const [phone, setPhone] = useState(user?.phone || "");
   const [email, setEmail] = useState("");
   const [guestName, setGuestName] = useState("");
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [confirmationResult, setConfirmationResult] = useState<{ confirmationCode: string; endTime: string; price: number } | null>(null);
+  const [confirmationResult, setConfirmationResult] = useState<{
+    confirmationCode: string;
+    endTime: string;
+    price: number;
+  } | null>(null);
 
   const dateStr = toDateString(selectedDate);
 
-  // Public query — no auth required
   const { data: dayReservations, isLoading: slotsLoading } = trpc.reservation.getByDate.useQuery(
     { date: dateStr },
   );
@@ -77,42 +106,90 @@ export default function BookCourt() {
     }));
   }, [dayReservations]);
 
-  function isSlotAvailable(slot: string, dur: number) {
-    const slotStart = timeToMinutes(slot);
-    const slotEnd = slotStart + dur;
-    if (slotEnd > 22 * 60 + 30) return false;
-    return !bookedRanges.some((r) => slotStart < r.end && slotEnd > r.start);
-  }
+  const isSlotBooked = useCallback(
+    (slotIndex: number) => {
+      const slotStart = timeToMinutes(TIME_SLOTS[slotIndex]);
+      const slotEnd = slotStart + 30;
+      return bookedRanges.some((r) => slotStart < r.end && slotEnd > r.start);
+    },
+    [bookedRanges]
+  );
 
-  function getSlotStatus(slot: string): "available" | "booked" | "session" {
-    const slotStart = timeToMinutes(slot);
-    const slotEnd = slotStart + 30;
-    const conflict = bookedRanges.find((r) => slotStart < r.end && slotEnd > r.start);
-    if (!conflict) return "available";
-    if (conflict.sessionName) return "session";
-    return "booked";
-  }
-
-  function getSlotSessionName(slot: string): string | null {
-    const slotStart = timeToMinutes(slot);
+  function getSlotSessionName(slotIndex: number): string | null {
+    const slotStart = timeToMinutes(TIME_SLOTS[slotIndex]);
     const slotEnd = slotStart + 30;
     const conflict = bookedRanges.find((r) => slotStart < r.end && slotEnd > r.start);
     return conflict?.sessionName ?? null;
   }
 
+  // Build contiguous selection between start and current, stopping at booked slots
+  const buildContiguousSelection = useCallback(
+    (startIdx: number, currentIdx: number): number[] => {
+      const minIdx = Math.min(startIdx, currentIdx);
+      const maxIdx = Math.max(startIdx, currentIdx);
+      const result: number[] = [];
+
+      // Walk from startIdx toward currentIdx, stopping at any booked slot
+      if (currentIdx >= startIdx) {
+        for (let i = startIdx; i <= maxIdx; i++) {
+          if (isSlotBooked(i)) break;
+          result.push(i);
+        }
+      } else {
+        for (let i = startIdx; i >= minIdx; i--) {
+          if (isSlotBooked(i)) break;
+          result.push(i);
+        }
+        result.sort((a, b) => a - b);
+      }
+      return result;
+    },
+    [isSlotBooked]
+  );
+
+  const handleSlotPointerDown = (index: number) => {
+    if (isSlotBooked(index)) return;
+    setIsDragging(true);
+    dragStartIndex.current = index;
+    setSelectedIndices([index]);
+  };
+
+  const handleSlotPointerEnter = (index: number) => {
+    if (!isDragging || dragStartIndex.current === null) return;
+    const selection = buildContiguousSelection(dragStartIndex.current, index);
+    setSelectedIndices(selection);
+  };
+
+  const handlePointerUp = () => {
+    setIsDragging(false);
+    dragStartIndex.current = null;
+  };
+
+  // Derived booking info
+  const selectedDuration = selectedIndices.length * 30;
+  const selectedStartTime = selectedIndices.length > 0 ? TIME_SLOTS[selectedIndices[0]] : null;
+  const selectedEndMins = selectedIndices.length > 0
+    ? timeToMinutes(TIME_SLOTS[selectedIndices[selectedIndices.length - 1]]) + 30
+    : 0;
+  const selectedEndTime = selectedEndMins > 0 ? minutesToTime(selectedEndMins) : null;
+  const price = calculatePrice(selectedDuration);
+  const priceDisplay = (price / 100).toFixed(0);
+
   function handleBooking() {
-    if (!selectedSlot) return;
+    if (!selectedStartTime || selectedDuration === 0) return;
     createMutation.mutate({
       date: dateStr,
-      startTime: selectedSlot,
-      duration,
+      startTime: selectedStartTime,
+      duration: selectedDuration,
       contactPhone: phone,
       contactEmail: email || undefined,
       guestName: guestName || undefined,
     });
   }
 
-  const price = duration === 60 ? 50 : 90;
+  const durationLabel = selectedDuration >= 60
+    ? `${Math.floor(selectedDuration / 60)}h${selectedDuration % 60 > 0 ? ` ${selectedDuration % 60}m` : ""}`
+    : `${selectedDuration}m`;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -145,7 +222,11 @@ export default function BookCourt() {
           <ArrowLeft className="h-4 w-4" /> Back
         </Button>
 
-        <h1 className="text-2xl font-semibold mb-6">Book Court Time</h1>
+        <h1 className="text-2xl font-semibold mb-2">Book Court Time</h1>
+        <p className="text-muted-foreground mb-6 text-sm flex items-center gap-1.5">
+          <GripVertical className="h-4 w-4" />
+          Click and drag across time slots to select your session length
+        </p>
 
         <div className="grid gap-6 lg:grid-cols-[auto_1fr]">
           {/* Calendar */}
@@ -160,97 +241,125 @@ export default function BookCourt() {
                 onSelect={(d) => {
                   if (d) {
                     setSelectedDate(d);
-                    setSelectedSlot(null);
+                    setSelectedIndices([]);
                   }
                 }}
                 disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
                 className="rounded-md"
               />
+
+              {/* Pricing reference */}
+              <div className="mt-4 pt-4 border-t space-y-1.5 text-xs text-muted-foreground">
+                <p className="font-medium text-foreground text-sm mb-2">Pricing</p>
+                <div className="flex justify-between"><span>30 minutes</span><span>$25</span></div>
+                <div className="flex justify-between"><span>1 hour</span><span>$50</span></div>
+                <div className="flex justify-between"><span>1.5 hours</span><span>$75</span></div>
+                <div className="flex justify-between"><span>2 hours</span><span className="text-primary font-medium">$90 <span className="text-muted-foreground">(save $10)</span></span></div>
+              </div>
             </CardContent>
           </Card>
 
           {/* Time Slots + Booking Form */}
           <div className="space-y-6">
-            {/* Duration Selector */}
-            <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Duration & Price</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex gap-3">
-                  <Button
-                    variant={duration === 60 ? "default" : "outline"}
-                    className="flex-1"
-                    onClick={() => { setDuration(60); setSelectedSlot(null); }}
-                  >
-                    <Clock className="h-4 w-4 mr-2" /> 1 Hour &mdash; $50
-                  </Button>
-                  <Button
-                    variant={duration === 120 ? "default" : "outline"}
-                    className="flex-1"
-                    onClick={() => { setDuration(120); setSelectedSlot(null); }}
-                  >
-                    <Clock className="h-4 w-4 mr-2" /> 2 Hours &mdash; $90
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Time Slots Grid */}
+            {/* Time Slots Grid — Drag Select */}
             <Card className="border-0 shadow-sm">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">
                   Available Slots — {format(selectedDate, "EEEE, MMMM d")}
                 </CardTitle>
-                <CardDescription>Select a start time for your {duration / 60}-hour session</CardDescription>
+                <CardDescription>
+                  {selectedIndices.length > 0
+                    ? `Selected: ${formatTimeDisplay(selectedStartTime!)} – ${formatTimeDisplay(selectedEndTime!)} (${durationLabel}) — $${priceDisplay}`
+                    : "Click a slot to start, then drag to extend your session"
+                  }
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {slotsLoading ? (
                   <div className="text-muted-foreground text-sm py-4">Loading availability...</div>
                 ) : (
-                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-                    {TIME_SLOTS.map((slot) => {
-                      const status = getSlotStatus(slot);
-                      const available = isSlotAvailable(slot, duration);
-                      const sessionName = getSlotSessionName(slot);
-                      const isSelected = selectedSlot === slot;
+                  <div
+                    className="grid grid-cols-4 sm:grid-cols-6 gap-1.5 select-none"
+                    onPointerUp={handlePointerUp}
+                    onPointerLeave={handlePointerUp}
+                  >
+                    {TIME_SLOTS.map((slot, index) => {
+                      const booked = isSlotBooked(index);
+                      const sessionName = getSlotSessionName(index);
+                      const isSelected = selectedIndices.includes(index);
+                      const isFirst = selectedIndices.length > 0 && selectedIndices[0] === index;
+                      const isLast = selectedIndices.length > 0 && selectedIndices[selectedIndices.length - 1] === index;
 
                       return (
                         <button
                           key={slot}
-                          disabled={!available}
-                          onClick={() => setSelectedSlot(slot)}
+                          disabled={booked}
+                          onPointerDown={(e) => {
+                            e.preventDefault();
+                            handleSlotPointerDown(index);
+                          }}
+                          onPointerEnter={() => handleSlotPointerEnter(index)}
                           className={`
-                            relative p-2 rounded-md text-sm font-medium transition-all border
+                            relative p-2.5 text-sm font-medium transition-all border touch-none
                             ${isSelected
-                              ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                              : available
-                                ? "bg-card hover:bg-accent border-border"
-                                : status === "session"
-                                  ? "bg-amber-50 border-amber-200 text-amber-700 cursor-not-allowed"
-                                  : "bg-muted/50 border-transparent text-muted-foreground cursor-not-allowed"
+                              ? `bg-primary text-primary-foreground border-primary shadow-sm ${isFirst ? "rounded-l-md" : ""} ${isLast ? "rounded-r-md" : ""} ${!isFirst && !isLast ? "rounded-none" : ""} ${isFirst && isLast ? "rounded-md" : ""}`
+                              : booked
+                                ? sessionName
+                                  ? "bg-amber-50 border-amber-200 text-amber-700 cursor-not-allowed rounded-md"
+                                  : "bg-muted/50 border-transparent text-muted-foreground cursor-not-allowed rounded-md"
+                                : "bg-card hover:bg-accent border-border rounded-md cursor-pointer"
                             }
                           `}
                         >
-                          {slot}
+                          <span className="block">{formatTimeDisplay(slot)}</span>
                           {sessionName && (
                             <span className="block text-[10px] truncate mt-0.5 opacity-80">{sessionName}</span>
+                          )}
+                          {isSelected && isFirst && selectedIndices.length > 1 && (
+                            <span className="absolute -bottom-5 left-0 text-[10px] text-primary font-medium whitespace-nowrap">
+                              Start
+                            </span>
+                          )}
+                          {isSelected && isLast && selectedIndices.length > 1 && (
+                            <span className="absolute -bottom-5 right-0 text-[10px] text-primary font-medium whitespace-nowrap">
+                              End
+                            </span>
                           )}
                         </button>
                       );
                     })}
                   </div>
                 )}
+
+                {/* Legend */}
+                <div className="flex items-center gap-4 mt-8 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-sm bg-card border border-border" />
+                    <span>Available</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-sm bg-primary" />
+                    <span>Selected</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-sm bg-muted/50" />
+                    <span>Booked</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-sm bg-amber-50 border border-amber-200" />
+                    <span>Session</span>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
-            {/* Booking Form */}
-            {selectedSlot && (
-              <Card className="border-0 shadow-sm">
+            {/* Booking Form — appears when slots are selected */}
+            {selectedIndices.length > 0 && (
+              <Card className="border-0 shadow-sm border-l-4 border-l-primary">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">Confirm Your Booking</CardTitle>
                   <CardDescription>
-                    {format(selectedDate, "EEEE, MMMM d")} at {selectedSlot} for {duration / 60} hour{duration === 120 ? "s" : ""} — <span className="font-semibold">${price}</span>
+                    {format(selectedDate, "EEEE, MMMM d")} &middot; {formatTimeDisplay(selectedStartTime!)} – {formatTimeDisplay(selectedEndTime!)} &middot; {durationLabel} — <span className="font-semibold text-foreground">${priceDisplay}</span>
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -292,7 +401,7 @@ export default function BookCourt() {
                     disabled={!phone || createMutation.isPending}
                     onClick={() => setShowConfirmDialog(true)}
                   >
-                    {createMutation.isPending ? "Booking..." : `Book for $${price}`}
+                    {createMutation.isPending ? "Booking..." : `Book ${durationLabel} for $${priceDisplay}`}
                   </Button>
                 </CardContent>
               </Card>
@@ -307,14 +416,14 @@ export default function BookCourt() {
           <DialogHeader>
             <DialogTitle>Confirm Reservation</DialogTitle>
             <DialogDescription>
-              You're about to book the court on {format(selectedDate, "MMMM d, yyyy")} at {selectedSlot} for {duration / 60} hour{duration === 120 ? "s" : ""}.
+              You're about to book the court on {format(selectedDate, "MMMM d, yyyy")} from {selectedStartTime && formatTimeDisplay(selectedStartTime)} to {selectedEndTime && formatTimeDisplay(selectedEndTime)}.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between"><span className="text-muted-foreground">Date</span><span className="font-medium">{format(selectedDate, "EEEE, MMMM d")}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Time</span><span className="font-medium">{selectedSlot}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Duration</span><span className="font-medium">{duration / 60} hour{duration === 120 ? "s" : ""}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Price</span><span className="font-semibold">${price}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Time</span><span className="font-medium">{selectedStartTime && formatTimeDisplay(selectedStartTime)} – {selectedEndTime && formatTimeDisplay(selectedEndTime)}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Duration</span><span className="font-medium">{durationLabel} ({selectedIndices.length} slot{selectedIndices.length > 1 ? "s" : ""})</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Price</span><span className="font-semibold">${priceDisplay}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Phone</span><span className="font-medium">{phone}</span></div>
             {email && <div className="flex justify-between"><span className="text-muted-foreground">Email</span><span className="font-medium">{email}</span></div>}
           </div>
@@ -328,7 +437,7 @@ export default function BookCourt() {
       </Dialog>
 
       {/* Success Dialog */}
-      <Dialog open={!!confirmationResult} onOpenChange={() => { setConfirmationResult(null); setShowConfirmDialog(false); setSelectedSlot(null); }}>
+      <Dialog open={!!confirmationResult} onOpenChange={() => { setConfirmationResult(null); setShowConfirmDialog(false); setSelectedIndices([]); }}>
         <DialogContent>
           <DialogHeader>
             <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
@@ -345,11 +454,12 @@ export default function BookCourt() {
           </div>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between"><span className="text-muted-foreground">Date</span><span>{format(selectedDate, "MMMM d, yyyy")}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Time</span><span>{selectedSlot} - {confirmationResult?.endTime}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Time</span><span>{selectedStartTime && formatTimeDisplay(selectedStartTime)} – {confirmationResult?.endTime && formatTimeDisplay(confirmationResult.endTime)}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Duration</span><span>{durationLabel}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Total</span><span className="font-semibold">${confirmationResult ? (confirmationResult.price / 100).toFixed(0) : ""}</span></div>
           </div>
           <DialogFooter>
-            <Button className="w-full" onClick={() => { setConfirmationResult(null); setShowConfirmDialog(false); setSelectedSlot(null); }}>
+            <Button className="w-full" onClick={() => { setConfirmationResult(null); setShowConfirmDialog(false); setSelectedIndices([]); }}>
               Done
             </Button>
           </DialogFooter>

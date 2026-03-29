@@ -57,9 +57,9 @@ describe("reservation.create", () => {
   it("allows unapproved_guest to create reservation (no login wall)", async () => {
     const user = makeUser({ role: "unapproved_guest" });
     const caller = appRouter.createCaller(makeCtx(user));
-
+    // Use a unique date+time to avoid conflicts from prior test runs
     const result = await caller.reservation.create({
-      date: "2026-05-20",
+      date: "2026-07-10",
       startTime: "06:00",
       duration: 60,
       contactPhone: "5551234567",
@@ -71,7 +71,7 @@ describe("reservation.create", () => {
     const caller = appRouter.createCaller(makeCtx());
 
     const result = await caller.reservation.create({
-      date: "2026-05-21",
+      date: "2026-07-11",
       startTime: "14:00",
       duration: 60,
       contactPhone: "5559876543",
@@ -80,7 +80,7 @@ describe("reservation.create", () => {
     expect(result.endTime).toBe("15:00");
   });
 
-  it("validates duration must be 60 or 120", async () => {
+  it("rejects duration that is not a multiple of 30", async () => {
     const user = makeUser();
     const caller = appRouter.createCaller(makeCtx(user));
 
@@ -88,10 +88,47 @@ describe("reservation.create", () => {
       caller.reservation.create({
         date: "2026-04-15",
         startTime: "10:00",
-        duration: 90 as 60, // force wrong value
+        duration: 45 as any,
         contactPhone: "5551234567",
       })
     ).rejects.toThrow();
+  });
+
+  it("accepts 30-minute single slot booking", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.reservation.create({
+      date: "2026-08-01",
+      startTime: "08:00",
+      duration: 30,
+      contactPhone: "5551111111",
+    });
+    expect(result.confirmationCode).toBeTruthy();
+    expect(result.endTime).toBe("08:30");
+    expect(result.price).toBe(2500); // $25
+  });
+
+  it("accepts 90-minute multi-slot booking with correct price", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.reservation.create({
+      date: "2026-08-02",
+      startTime: "09:00",
+      duration: 90,
+      contactPhone: "5552222222",
+    });
+    expect(result.confirmationCode).toBeTruthy();
+    expect(result.endTime).toBe("10:30");
+    expect(result.price).toBe(7500); // $75 = 3 slots x $25
+  });
+
+  it("applies 2-hour discount ($90 instead of $100)", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.reservation.create({
+      date: "2026-08-03",
+      startTime: "12:00",
+      duration: 120,
+      contactPhone: "5553333333",
+    });
+    expect(result.price).toBe(9000); // $90 discount
   });
 
   it("requires contactPhone", async () => {

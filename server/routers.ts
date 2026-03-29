@@ -40,7 +40,7 @@ const reservationRouter = router({
     .input(z.object({
       date: z.string(),
       startTime: z.string(),
-      duration: z.number().refine(d => d === 60 || d === 120, "Duration must be 60 or 120 minutes"),
+      duration: z.number().refine(d => d >= 30 && d % 30 === 0, "Duration must be a multiple of 30 minutes"),
       contactPhone: z.string().min(1, "Phone number is required"),
       contactEmail: z.string().email().optional().or(z.literal("")),
       guestName: z.string().optional(),
@@ -67,8 +67,17 @@ const reservationRouter = router({
         }
       }
 
-      // Price
-      const price = input.duration === 60 ? 5000 : 9000;
+      // Price: $25 per 30-min slot, with 2hr ($90) being a discount
+      // 30min=$25, 60min=$50, 90min=$75, 120min=$90, 150min=$115, etc.
+      const slots = input.duration / 30;
+      let price: number;
+      if (input.duration <= 120) {
+        // Up to 2 hours: $25/slot but 4-slot (2hr) is capped at $90
+        price = slots === 4 ? 9000 : slots * 2500;
+      } else {
+        // Beyond 2 hours: $90 for first 4 slots + $25 per additional slot
+        price = 9000 + (slots - 4) * 2500;
+      }
       const confirmationCode = nanoid(8).toUpperCase();
 
       // Use the logged-in user's ID if available, otherwise 0 for anonymous

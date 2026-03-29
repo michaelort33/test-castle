@@ -65,3 +65,14 @@
 ## Bug Fixes & Changes (Round 2)
 - [x] Remove login wall — let anyone access and book with just a phone number
 - [x] Fix NaN date bug on reservations (especially March 29th) — shows NaN in admin and user can't see reservation
+
+## Multi-Session Linked Reservations (Round 3)
+- [x] Backend: update reservation.create to accept any duration that is a multiple of 30 minutes
+- [x] Backend: proportional pricing ($25 per 30-min slot, with $90 cap for 2hr)
+- [x] Frontend: drag-select UI on booking page — click and drag across consecutive available slots
+- [x] Frontend: visual highlight of selected contiguous block during drag
+- [x] Frontend: dynamic price calculation based on number of selected slots
+- [x] Frontend: remove old fixed 1hr/2hr duration selector, replace with drag-based selection
+- [x] Admin display: show multi-slot reservations properly with full time range
+- [x] Dashboard display: show multi-slot reservations properly
+- [x] Update tests for flexible duration validation

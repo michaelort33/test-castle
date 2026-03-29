@@ -91,3 +91,6 @@
 
 ## UX Fixes (Round 6)
 - [x] Add "Book Now" button above calendar when slots are selected that auto-scrolls to booking form
+
+## UX Fixes (Round 7)
+- [x] Change time slots from current range to 5:00 AM - 11:00 PM (30-min intervals)

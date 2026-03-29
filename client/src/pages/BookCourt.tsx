@@ -15,12 +15,12 @@ import { toast } from "sonner";
 import { toDateString } from "@/lib/dates";
 import { format } from "date-fns";
 
-// Generate time slots from 6:00 AM to 10:00 PM in 30-min intervals
+// Generate time slots from 5:00 AM to 11:00 PM in 30-min intervals
 function generateTimeSlots() {
   const slots: string[] = [];
-  for (let h = 6; h <= 21; h++) {
+  for (let h = 5; h <= 22; h++) {
     slots.push(`${String(h).padStart(2, "0")}:00`);
-    if (h < 22) slots.push(`${String(h).padStart(2, "0")}:30`);
+    if (h < 23) slots.push(`${String(h).padStart(2, "0")}:30`);
   }
   return slots;
 }

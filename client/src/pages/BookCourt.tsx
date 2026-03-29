@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { trpc } from "@/lib/trpc";
-import { Castle, LogOut, ArrowLeft, Check, GripVertical } from "lucide-react";
+import { Castle, LogOut, ArrowLeft, Check, GripVertical, ArrowDown } from "lucide-react";
 import { useLocation } from "wouter";
 import { useState, useMemo, useCallback, useRef } from "react";
 import { toast } from "sonner";
@@ -69,6 +69,11 @@ export default function BookCourt() {
   const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const dragStartIndex = useRef<number | null>(null);
+  const bookingFormRef = useRef<HTMLDivElement>(null);
+
+  const scrollToForm = () => {
+    bookingFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   const [phone, setPhone] = useState(user?.phone || "");
   const [email, setEmail] = useState("");
@@ -231,6 +236,23 @@ export default function BookCourt() {
           Click and drag across time slots to select your session length
         </p>
 
+        {/* Sticky Book Now bar when slots selected */}
+        {selectedIndices.length > 0 && (
+          <div className="sticky top-16 z-40 -mx-4 px-4 py-3 mb-2 bg-primary text-primary-foreground rounded-lg shadow-lg flex items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="text-sm font-medium">
+              {formatTimeDisplay(selectedStartTime!)} – {formatTimeDisplay(selectedEndTime!)} &middot; {durationLabel} &middot; <span className="font-bold">${priceDisplay}</span>
+            </div>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="gap-1.5 font-semibold shrink-0"
+              onClick={scrollToForm}
+            >
+              Book Now <ArrowDown className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
+
         <div className="grid gap-6 lg:grid-cols-[auto_1fr]">
           {/* Calendar */}
           <Card className="border-0 shadow-sm">
@@ -361,6 +383,7 @@ export default function BookCourt() {
 
             {/* Booking Form — appears when slots are selected */}
             {selectedIndices.length > 0 && (
+              <div ref={bookingFormRef} className="scroll-mt-32">
               <Card className="border-0 shadow-sm border-l-4 border-l-primary">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">Confirm Your Booking</CardTitle>
@@ -419,6 +442,7 @@ export default function BookCourt() {
                   </Button>
                 </CardContent>
               </Card>
+              </div>
             )}
           </div>
         </div>

@@ -88,3 +88,6 @@
 
 ## UX Fixes (Round 5)
 - [x] Make booked time slots more visually distinct (stronger color, strikethrough, or "Booked" label)
+
+## UX Fixes (Round 6)
+- [x] Add "Book Now" button above calendar when slots are selected that auto-scrolls to booking form

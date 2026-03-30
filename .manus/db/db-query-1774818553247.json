@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE `reservations` ADD `fullName` varchar(200); ALTER TABLE `reservations` ADD `notifyBeforeReservation` boolean DEFAULT true NOT NULL;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2BaPWTizQqDt2Cn.c33447890b83 --database Jf8hz4dwgnG3EFpFr2efJD --execute ALTER TABLE `reservations` ADD `fullName` varchar(200); ALTER TABLE `reservations` ADD `notifyBeforeReservation` boolean DEFAULT true NOT NULL;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1313
+}

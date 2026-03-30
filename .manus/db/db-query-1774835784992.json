@@ -1,0 +1,136 @@
+{
+  "query": "SELECT id, date, startTime, endTime, status FROM reservations WHERE date >= '2035-01-01' ORDER BY date LIMIT 30;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2BaPWTizQqDt2Cn.20cd508fb0a6 --database eCQCVHpxbypjRknfguuW2A --execute SELECT id, date, startTime, endTime, status FROM reservations WHERE date >= '2035-01-01' ORDER BY date LIMIT 30;",
+  "rows": [
+    {
+      "id": "30048",
+      "date": "2035-01-15",
+      "startTime": "07:00",
+      "endTime": "08:00",
+      "status": "confirmed"
+    },
+    {
+      "id": "30050",
+      "date": "2035-01-16",
+      "startTime": "07:00",
+      "endTime": "08:00",
+      "status": "confirmed"
+    },
+    {
+      "id": "30052",
+      "date": "2035-02-01",
+      "startTime": "10:00",
+      "endTime": "11:00",
+      "status": "confirmed"
+    },
+    {
+      "id": "30056",
+      "date": "2035-02-03",
+      "startTime": "18:00",
+      "endTime": "19:00",
+      "status": "confirmed"
+    },
+    {
+      "id": "30057",
+      "date": "2035-03-01",
+      "startTime": "08:00",
+      "endTime": "09:00",
+      "status": "cancelled"
+    },
+    {
+      "id": "30063",
+      "date": "2035-03-01",
+      "startTime": "08:00",
+      "endTime": "09:00",
+      "status": "cancelled"
+    },
+    {
+      "id": "30064",
+      "date": "2035-03-01",
+      "startTime": "08:00",
+      "endTime": "09:00",
+      "status": "cancelled"
+    },
+    {
+      "id": "30065",
+      "date": "2035-03-01",
+      "startTime": "08:00",
+      "endTime": "09:00",
+      "status": "cancelled"
+    },
+    {
+      "id": "30058",
+      "date": "2035-03-02",
+      "startTime": "08:00",
+      "endTime": "09:00",
+      "status": "confirmed"
+    },
+    {
+      "id": "30059",
+      "date": "2035-06-01",
+      "startTime": "06:00",
+      "endTime": "06:30",
+      "status": "confirmed"
+    },
+    {
+      "id": "30060",
+      "date": "2035-06-02",
+      "startTime": "06:00",
+      "endTime": "07:00",
+      "status": "confirmed"
+    },
+    {
+      "id": "30061",
+      "date": "2035-06-03",
+      "startTime": "06:00",
+      "endTime": "07:30",
+      "status": "confirmed"
+    },
+    {
+      "id": "30062",
+      "date": "2035-06-04",
+      "startTime": "06:00",
+      "endTime": "08:00",
+      "status": "confirmed"
+    },
+    {
+      "id": "30049",
+      "date": "2036-06-10",
+      "startTime": "06:00",
+      "endTime": "07:00",
+      "status": "confirmed"
+    },
+    {
+      "id": "30051",
+      "date": "2036-06-11",
+      "startTime": "14:00",
+      "endTime": "15:00",
+      "status": "confirmed"
+    },
+    {
+      "id": "30053",
+      "date": "2036-07-01",
+      "startTime": "08:00",
+      "endTime": "08:30",
+      "status": "confirmed"
+    },
+    {
+      "id": "30054",
+      "date": "2036-07-02",
+      "startTime": "09:00",
+      "endTime": "10:30",
+      "status": "confirmed"
+    },
+    {
+      "id": "30055",
+      "date": "2036-07-03",
+      "startTime": "12:00",
+      "endTime": "14:00",
+      "status": "confirmed"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tdate\tstartTime\tendTime\tstatus\n30048\t2035-01-15\t07:00\t08:00\tconfirmed\n30050\t2035-01-16\t07:00\t08:00\tconfirmed\n30052\t2035-02-01\t10:00\t11:00\tconfirmed\n30056\t2035-02-03\t18:00\t19:00\tconfirmed\n30057\t2035-03-01\t08:00\t09:00\tcancelled\n30063\t2035-03-01\t08:00\t09:00\tcancelled\n30064\t2035-03-01\t08:00\t09:00\tcancelled\n30065\t2035-03-01\t08:00\t09:00\tcancelled\n30058\t2035-03-02\t08:00\t09:00\tconfirmed\n30059\t2035-06-01\t06:00\t06:30\tconfirmed\n30060\t2035-06-02\t06:00\t07:00\tconfirmed\n30061\t2035-06-03\t06:00\t07:30\tconfirmed\n30062\t2035-06-04\t06:00\t08:00\tconfirmed\n30049\t2036-06-10\t06:00\t07:00\tconfirmed\n30051\t2036-06-11\t14:00\t15:00\tconfirmed\n30053\t2036-07-01\t08:00\t08:30\tconfirmed\n30054\t2036-07-02\t09:00\t10:30\tconfirmed\n30055\t2036-07-03\t12:00\t14:00\tconfirmed\n",
+  "stderr": "",
+  "execution_time_ms": 55
+}

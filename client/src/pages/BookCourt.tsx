@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { trpc } from "@/lib/trpc";
-import { Castle, LogOut, ArrowLeft, Check, GripVertical, ArrowDown, Users, Clock, UserPlus } from "lucide-react";
+import { Castle, LogOut, ArrowLeft, Check, GripVertical, ArrowDown, Users, Clock, UserPlus, XCircle } from "lucide-react";
 import { useLocation } from "wouter";
 import { useState, useMemo, useCallback, useRef } from "react";
 import { toast } from "sonner";
@@ -112,6 +112,22 @@ export default function BookCourt() {
     endTime: string;
     price: number;
   } | null>(null);
+
+  // Cancel-by-code state
+  const [showCancelByCode, setShowCancelByCode] = useState(false);
+  const [cancelCode, setCancelCode] = useState("");
+  const [cancelPhone, setCancelPhone] = useState("");
+
+  const cancelByCodeMutation = trpc.reservation.cancelByCode.useMutation({
+    onSuccess: () => {
+      toast.success("Reservation cancelled successfully");
+      setShowCancelByCode(false);
+      setCancelCode("");
+      setCancelPhone("");
+      utils.reservation.getByDate.invalidate({ date: dateStr });
+    },
+    onError: (err) => toast.error(err.message),
+  });
 
   const dateStr = toDateString(selectedDate);
 
@@ -309,7 +325,12 @@ export default function BookCourt() {
           <ArrowLeft className="h-4 w-4" /> Back
         </Button>
 
-        <h1 className="text-2xl font-semibold mb-2">Book Court Time</h1>
+        <div className="flex items-center justify-between mb-2">
+          <h1 className="text-2xl font-semibold">Book Court Time</h1>
+          <Button variant="outline" size="sm" className="gap-1.5 text-destructive hover:text-destructive" onClick={() => setShowCancelByCode(true)}>
+            <XCircle className="h-4 w-4" /> Cancel a Booking
+          </Button>
+        </div>
         <p className="text-muted-foreground mb-6 text-sm flex items-center gap-1.5">
           <GripVertical className="h-4 w-4" />
           Click and drag across time slots to select your session length. Tap green Open Play slots to join.
@@ -751,6 +772,53 @@ export default function BookCourt() {
               className={openPlayDialog && openPlayDialog.confirmedCount >= openPlayDialog.maxPlayers ? "bg-amber-600 hover:bg-amber-700" : "bg-emerald-600 hover:bg-emerald-700"}
             >
               {joinMutation.isPending ? "Joining..." : openPlayDialog && openPlayDialog.confirmedCount >= openPlayDialog.maxPlayers ? "Join Waitlist" : "Join Session"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel By Code Dialog */}
+      <Dialog open={showCancelByCode} onOpenChange={setShowCancelByCode}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <XCircle className="h-5 w-5 text-destructive" />
+              Cancel Reservation
+            </DialogTitle>
+            <DialogDescription>
+              Enter your confirmation code and phone number to cancel your reservation.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="cancelCode">Confirmation Code</Label>
+              <Input
+                id="cancelCode"
+                placeholder="e.g., ABCD1234"
+                value={cancelCode}
+                onChange={(e) => setCancelCode(e.target.value.toUpperCase())}
+                className="font-mono"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cancelPhone">Phone Number</Label>
+              <Input
+                id="cancelPhone"
+                type="tel"
+                placeholder="(631) 555-1234"
+                value={cancelPhone}
+                onChange={(e) => setCancelPhone(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCancelByCode(false)}>Back</Button>
+            <Button
+              variant="destructive"
+              disabled={!cancelCode || !cancelPhone || cancelByCodeMutation.isPending}
+              onClick={() => cancelByCodeMutation.mutate({ confirmationCode: cancelCode, contactPhone: cancelPhone })}
+            >
+              {cancelByCodeMutation.isPending ? "Cancelling..." : "Cancel Reservation"}
             </Button>
           </DialogFooter>
         </DialogContent>

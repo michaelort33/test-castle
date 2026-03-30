@@ -11,9 +11,9 @@ import { Calendar } from "@/components/ui/calendar";
 import { trpc } from "@/lib/trpc";
 import { getLoginUrl } from "@/const";
 import { toSafeDate, formatDate, formatTimeDisplay as formatTimeAMPM } from "@/lib/dates";
-import { Castle, LogOut, Users, CalendarDays, Trophy, BarChart3, Check, X, Shield, Tag, Plus, UserPlus, Clock, Trash2 } from "lucide-react";
+import { Castle, LogOut, Users, CalendarDays, Trophy, BarChart3, Check, X, Shield, Tag, Plus, UserPlus, Clock, Trash2, Pencil } from "lucide-react";
 import { useLocation } from "wouter";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -21,11 +21,20 @@ export default function Admin() {
   const { user, loading, isAuthenticated, logout } = useAuth();
   const [, setLocation] = useLocation();
 
+  // Fix B6: Move render-phase navigation into useEffect
+  useEffect(() => {
+    if (loading) return;
+    if (!isAuthenticated) {
+      window.location.href = getLoginUrl();
+    } else if (user?.role !== "admin") {
+      setLocation("/dashboard");
+    }
+  }, [loading, isAuthenticated, user?.role, setLocation]);
+
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center"><div className="animate-pulse text-muted-foreground">Loading...</div></div>;
   }
-  if (!isAuthenticated) { window.location.href = getLoginUrl(); return null; }
-  if (user?.role !== "admin") { setLocation("/dashboard"); return null; }
+  if (!isAuthenticated || user?.role !== "admin") return null;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -138,6 +147,9 @@ function UsersTab() {
                     <Button size="sm" className="gap-1" onClick={() => approveMutation.mutate({ userId: u.id })} disabled={approveMutation.isPending}>
                       <Check className="h-3 w-3" /> Approve
                     </Button>
+                    <Button size="sm" variant="ghost" className="gap-1 text-destructive hover:text-destructive" onClick={() => setRoleMutation.mutate({ userId: u.id, role: "unapproved_guest" })} disabled={setRoleMutation.isPending}>
+                      <X className="h-3 w-3" /> Reject
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -230,12 +242,12 @@ function ReservationsTab() {
                     <div>
                       <p className="font-medium">{formatTimeAMPM(r.startTime)} - {formatTimeAMPM(r.endTime)}</p>
                       <p className="text-sm text-muted-foreground">
-                        {(r as any).fullName || userName || "Unknown"} · {r.contactPhone} · {r.duration >= 60 ? `${Math.floor(r.duration / 60)}h${r.duration % 60 > 0 ? ` ${r.duration % 60}m` : ""}` : `${r.duration}m`} · ${(r.price / 100).toFixed(0)} · <span className="font-mono text-xs">{r.confirmationCode}</span>
+                        {r.fullName || userName || "Unknown"} · {r.contactPhone} · {r.duration >= 60 ? `${Math.floor(r.duration / 60)}h${r.duration % 60 > 0 ? ` ${r.duration % 60}m` : ""}` : `${r.duration}m`} · ${(r.price / 100).toFixed(0)} · <span className="font-mono text-xs">{r.confirmationCode}</span>
                       </p>
                       <div className="flex items-center gap-2 mt-0.5">
                         {r.sessionName && <Badge variant="secondary" className="text-xs">{r.sessionName}</Badge>}
                         <Badge variant={r.status === "confirmed" ? "default" : "destructive"} className="text-xs">{r.status}</Badge>
-                        {(r as any).notifyBeforeReservation && <Badge variant="outline" className="text-xs">Notify</Badge>}
+                        {r.notifyBeforeReservation && <Badge variant="outline" className="text-xs">Notify</Badge>}
                       </div>
                     </div>
                   </div>
@@ -671,15 +683,32 @@ function OpenPlayTab() {
                     </div>
                     <div className="flex gap-2">
                       {s.status === "active" && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive text-xs"
-                          onClick={() => cancelMutation.mutate({ id: s.id })}
-                          disabled={cancelMutation.isPending}
-                        >
-                          <X className="h-3 w-3 mr-1" /> Cancel
-                        </Button>
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs"
+                            onClick={() => setEditSession({
+                              id: s.id,
+                              title: s.title,
+                              maxPlayers: String(s.maxPlayers),
+                              description: s.description || "",
+                              startTime: s.startTime,
+                              endTime: s.endTime,
+                            })}
+                          >
+                            <Pencil className="h-3 w-3 mr-1" /> Edit
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive text-xs"
+                            onClick={() => cancelMutation.mutate({ id: s.id })}
+                            disabled={cancelMutation.isPending}
+                          >
+                            <X className="h-3 w-3 mr-1" /> Cancel
+                          </Button>
+                        </>
                       )}
                     </div>
                   </div>

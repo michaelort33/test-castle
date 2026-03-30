@@ -1,0 +1,9 @@
+{
+  "query": "DELETE FROM reservations WHERE date >= '2035-01-01'; DELETE FROM open_play_signups WHERE sessionId IN (SELECT id FROM open_play_sessions WHERE date >= '2035-01-01'); DELETE FROM open_play_sessions WHERE date >= '2035-01-01'; DELETE FROM tournament_registrations WHERE tournamentId IN (SELECT id FROM tournaments WHERE date >= '2035-01-01'); DELETE FROM tournaments WHERE date >= '2035-01-01';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2BaPWTizQqDt2Cn.20cd508fb0a6 --database eCQCVHpxbypjRknfguuW2A --execute DELETE FROM reservations WHERE date >= '2035-01-01'; DELETE FROM open_play_signups WHERE sessionId IN (SELECT id FROM open_play_sessions WHERE date >= '2035-01-01'); DELETE FROM open_play_sessions WHERE date >= '2035-01-01'; DELETE FROM tournament_registrations WHERE tournamentId IN (SELECT id FROM tournaments WHERE date >= '2035-01-01'); DELETE FROM tournaments WHERE date >= '2035-01-01';",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 135
+}

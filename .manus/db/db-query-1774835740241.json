@@ -1,0 +1,31 @@
+{
+  "query": "SELECT COUNT(*) as cnt FROM reservations WHERE date >= '2030-01-01'; SELECT id, date, startTime, endTime, status FROM reservations WHERE date >= '2030-01-01' LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2BaPWTizQqDt2Cn.20cd508fb0a6 --database eCQCVHpxbypjRknfguuW2A --execute SELECT COUNT(*) as cnt FROM reservations WHERE date >= '2030-01-01'; SELECT id, date, startTime, endTime, status FROM reservations WHERE date >= '2030-01-01' LIMIT 5;",
+  "rows": [
+    {
+      "cnt": "17"
+    },
+    {
+      "cnt": "id\tdate\tstartTime\tendTime\tstatus"
+    },
+    {
+      "cnt": "30048\t2035-01-15\t07:00\t08:00\tconfirmed"
+    },
+    {
+      "cnt": "30050\t2035-01-16\t07:00\t08:00\tconfirmed"
+    },
+    {
+      "cnt": "30052\t2035-02-01\t10:00\t11:00\tconfirmed"
+    },
+    {
+      "cnt": "30056\t2035-02-03\t18:00\t19:00\tconfirmed"
+    },
+    {
+      "cnt": "30057\t2035-03-01\t08:00\t09:00\tcancelled"
+    }
+  ],
+  "messages": [],
+  "stdout": "cnt\n17\nid\tdate\tstartTime\tendTime\tstatus\n30048\t2035-01-15\t07:00\t08:00\tconfirmed\n30050\t2035-01-16\t07:00\t08:00\tconfirmed\n30052\t2035-02-01\t10:00\t11:00\tconfirmed\n30056\t2035-02-03\t18:00\t19:00\tconfirmed\n30057\t2035-03-01\t08:00\t09:00\tcancelled\n",
+  "stderr": "",
+  "execution_time_ms": 61
+}

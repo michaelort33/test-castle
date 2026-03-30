@@ -1,4 +1,4 @@
-import { boolean, int, mysqlEnum, mysqlTable, text, timestamp, varchar, date, time, bigint } from "drizzle-orm/mysql-core";
+import { boolean, int, mysqlEnum, mysqlTable, text, timestamp, varchar, date, time, bigint, index, uniqueIndex } from "drizzle-orm/mysql-core";
 
 /**
  * Users table — extended with phone, role enum includes unapproved_guest
@@ -21,10 +21,11 @@ export type InsertUser = typeof users.$inferInsert;
 
 /**
  * Reservations table — court bookings with 30-min intervals
+ * userId is nullable for anonymous bookings (NULL instead of sentinel 0)
  */
 export const reservations = mysqlTable("reservations", {
   id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+  userId: int("userId").references(() => users.id, { onDelete: "set null" }),  // nullable for anonymous bookings
   date: date("date").notNull(),
   startTime: varchar("startTime", { length: 5 }).notNull(), // "HH:MM" format
   endTime: varchar("endTime", { length: 5 }).notNull(),     // "HH:MM" format
@@ -38,7 +39,10 @@ export const reservations = mysqlTable("reservations", {
   confirmationCode: varchar("confirmationCode", { length: 10 }).notNull(),
   status: mysqlEnum("status", ["confirmed", "cancelled"]).default("confirmed").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (table) => [
+  index("idx_reservations_date_status").on(table.date, table.status),
+  index("idx_reservations_userId").on(table.userId),
+]);
 
 export type Reservation = typeof reservations.$inferSelect;
 export type InsertReservation = typeof reservations.$inferInsert;
@@ -54,10 +58,12 @@ export const tournaments = mysqlTable("tournaments", {
   endTime: varchar("endTime", { length: 5 }),
   details: text("details"),
   maxParticipants: int("maxParticipants"),
-  winnerId: int("winnerId"),
+  winnerId: int("winnerId").references(() => users.id, { onDelete: "set null" }),
   status: mysqlEnum("status", ["upcoming", "in_progress", "completed", "cancelled"]).default("upcoming").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (table) => [
+  index("idx_tournaments_status").on(table.status),
+]);
 
 export type Tournament = typeof tournaments.$inferSelect;
 export type InsertTournament = typeof tournaments.$inferInsert;
@@ -67,10 +73,12 @@ export type InsertTournament = typeof tournaments.$inferInsert;
  */
 export const tournamentRegistrations = mysqlTable("tournament_registrations", {
   id: int("id").autoincrement().primaryKey(),
-  tournamentId: int("tournamentId").notNull(),
-  userId: int("userId").notNull(),
+  tournamentId: int("tournamentId").notNull().references(() => tournaments.id, { onDelete: "cascade" }),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
   registeredAt: timestamp("registeredAt").defaultNow().notNull(),
-});
+}, (table) => [
+  uniqueIndex("idx_tournament_user").on(table.tournamentId, table.userId),
+]);
 
 export type TournamentRegistration = typeof tournamentRegistrations.$inferSelect;
 export type InsertTournamentRegistration = typeof tournamentRegistrations.$inferInsert;
@@ -88,7 +96,9 @@ export const openPlaySessions = mysqlTable("open_play_sessions", {
   maxPlayers: int("maxPlayers").notNull(),
   status: mysqlEnum("status", ["active", "cancelled"]).default("active").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (table) => [
+  index("idx_open_play_sessions_date_status").on(table.date, table.status),
+]);
 
 export type OpenPlaySession = typeof openPlaySessions.$inferSelect;
 export type InsertOpenPlaySession = typeof openPlaySessions.$inferInsert;
@@ -100,14 +110,16 @@ export type InsertOpenPlaySession = typeof openPlaySessions.$inferInsert;
  */
 export const openPlaySignups = mysqlTable("open_play_signups", {
   id: int("id").autoincrement().primaryKey(),
-  sessionId: int("sessionId").notNull(),
+  sessionId: int("sessionId").notNull().references(() => openPlaySessions.id, { onDelete: "cascade" }),
   playerName: varchar("playerName", { length: 200 }).notNull(),
   phone: varchar("phone", { length: 20 }).notNull(),
   email: varchar("email", { length: 320 }),
   status: mysqlEnum("status", ["confirmed", "waitlisted", "cancelled"]).default("confirmed").notNull(),
   position: int("position").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (table) => [
+  index("idx_open_play_signups_session_status").on(table.sessionId, table.status),
+]);
 
 export type OpenPlaySignup = typeof openPlaySignups.$inferSelect;
 export type InsertOpenPlaySignup = typeof openPlaySignups.$inferInsert;

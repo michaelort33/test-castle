@@ -2,17 +2,33 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
 import { getLoginUrl } from "@/const";
 import { toSafeDate, formatDate, formatTimeDisplay } from "@/lib/dates";
-import { CalendarDays, Trophy, Clock, ArrowRight, Castle, LogOut, X } from "lucide-react";
+import { CalendarDays, Trophy, Clock, ArrowRight, Castle, LogOut, X, Phone } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
+import { useEffect, useState } from "react";
+
+function formatDuration(minutes: number): string {
+  if (minutes >= 60) {
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  }
+  return `${minutes}m`;
+}
 
 export default function Dashboard() {
   const { user, loading, isAuthenticated, logout } = useAuth();
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
+
+  // Profile phone update state
+  const [editingPhone, setEditingPhone] = useState(false);
+  const [phoneValue, setPhoneValue] = useState("");
 
   const { data: myReservations, isLoading: resLoading } = trpc.reservation.mine.useQuery(
     undefined,
@@ -27,6 +43,30 @@ export default function Dashboard() {
     onError: (err) => toast.error(err.message),
   });
 
+  const updatePhoneMutation = trpc.profile.updatePhone.useMutation({
+    onSuccess: () => {
+      utils.auth.me.invalidate();
+      setEditingPhone(false);
+      toast.success("Phone number updated");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  // Fix B6: Move render-phase navigation into useEffect
+  useEffect(() => {
+    if (loading) return;
+    if (!isAuthenticated) {
+      window.location.href = getLoginUrl();
+    }
+  }, [loading, isAuthenticated]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (user?.role === "unapproved_guest") {
+      setLocation("/pending");
+    }
+  }, [loading, user?.role, setLocation]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -35,13 +75,7 @@ export default function Dashboard() {
     );
   }
 
-  if (!isAuthenticated) {
-    window.location.href = getLoginUrl();
-    return null;
-  }
-
-  if (user?.role === "unapproved_guest") {
-    setLocation("/pending");
+  if (!isAuthenticated || user?.role === "unapproved_guest") {
     return null;
   }
 
@@ -115,6 +149,53 @@ export default function Dashboard() {
           </Card>
         </div>
 
+        {/* Profile Section */}
+        <Card className="border-0 shadow-sm mb-6">
+          <CardHeader>
+            <CardTitle className="text-lg">Profile</CardTitle>
+            <CardDescription>Manage your account settings</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <Phone className="h-5 w-5 text-muted-foreground" />
+              {editingPhone ? (
+                <div className="flex items-center gap-2 flex-1">
+                  <Input
+                    value={phoneValue}
+                    onChange={(e) => setPhoneValue(e.target.value)}
+                    placeholder="Enter phone number"
+                    className="max-w-xs"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={() => updatePhoneMutation.mutate({ phone: phoneValue })}
+                    disabled={updatePhoneMutation.isPending || !phoneValue.trim()}
+                  >
+                    Save
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setEditingPhone(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">{user?.phone || "No phone number set"}</span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setPhoneValue(user?.phone || "");
+                      setEditingPhone(true);
+                    }}
+                  >
+                    {user?.phone ? "Edit" : "Add"}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Upcoming Reservations */}
         <Card className="border-0 shadow-sm mb-6">
           <CardHeader>
@@ -151,7 +232,7 @@ export default function Dashboard() {
                           <p className="font-medium">{formatTimeDisplay(res.startTime)} - {formatTimeDisplay(res.endTime)}</p>
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="text-sm text-muted-foreground">
-                              {(res as any).fullName && `${(res as any).fullName} · `}{res.duration >= 60 ? `${Math.floor(res.duration / 60)}h${res.duration % 60 > 0 ? ` ${res.duration % 60}m` : ""}` : `${res.duration}m`} &middot; ${(res.price / 100).toFixed(0)}
+                              {res.fullName && `${res.fullName} · `}{formatDuration(res.duration)} &middot; ${(res.price / 100).toFixed(0)}
                             </span>
                             {res.sessionName && (
                               <Badge variant="secondary" className="text-xs">{res.sessionName}</Badge>
@@ -203,7 +284,7 @@ export default function Dashboard() {
                         <div>
                           <p className="font-medium">{formatTimeDisplay(res.startTime)} - {formatTimeDisplay(res.endTime)}</p>
                           <span className="text-sm text-muted-foreground">
-                            {res.duration} min
+                            {formatDuration(res.duration)}
                           </span>
                           {res.status === "cancelled" && (
                             <Badge variant="destructive" className="ml-2 text-xs">Cancelled</Badge>

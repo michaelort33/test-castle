@@ -207,6 +207,7 @@ function TournamentCard({
     endTime: string | null;
     details: string | null;
     maxParticipants: number | null;
+    registrationCount?: number;
     winnerId: number | null;
     status: string;
   };
@@ -217,6 +218,7 @@ function TournamentCard({
   isPending: boolean;
 }) {
   const isUpcoming = t.status === "upcoming" || t.status === "in_progress";
+  const isFull = t.maxParticipants != null && (t.registrationCount ?? 0) >= t.maxParticipants;
 
   return (
     <Card className="border-0 shadow-sm">
@@ -238,12 +240,15 @@ function TournamentCard({
       </CardHeader>
       <CardContent>
         {t.details && <p className="text-sm mb-3">{t.details}</p>}
-        <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between">
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             {t.maxParticipants && (
               <span className="flex items-center gap-1">
-                <Users className="h-3 w-3" /> Max {t.maxParticipants}
+                <Users className="h-3 w-3" /> {t.registrationCount ?? 0}/{t.maxParticipants}
               </span>
+            )}
+            {isFull && (
+              <Badge variant="destructive" className="text-xs">Full</Badge>
             )}
           </div>
           {isUpcoming && canRegister && (
@@ -252,8 +257,8 @@ function TournamentCard({
                 Unregister
               </Button>
             ) : (
-              <Button size="sm" onClick={onRegister} disabled={isPending}>
-                Register
+              <Button size="sm" onClick={onRegister} disabled={isPending || isFull}>
+                {isFull ? "Full" : "Register"}
               </Button>
             )
           )}

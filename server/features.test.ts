@@ -1,10 +1,23 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 
 // ─── Test Helpers ────────────────────────────────────────────────
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
+
+// Generate unique dates per test run using timestamp seed to avoid DB collisions
+const runSeed = Math.floor(Date.now() / 1000) % 100000;
+let dateCounter = 500; // Offset from audit-fixes.test.ts
+function uniqueDate(): string {
+  dateCounter++;
+  const combined = runSeed * 100 + dateCounter;
+  // Spread across years 2100-2149 to avoid collisions with audit-fixes.test.ts
+  const year = 2100 + (combined % 50);
+  const month = (Math.floor(combined / 50) % 12) + 1;
+  const day = (Math.floor(combined / 600) % 28) + 1;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
 
 function makeUser(overrides: Partial<AuthenticatedUser> = {}): AuthenticatedUser {
   return {
@@ -57,9 +70,9 @@ describe("reservation.create", () => {
   it("allows unapproved_guest to create reservation (no login wall)", async () => {
     const user = makeUser({ role: "unapproved_guest" });
     const caller = appRouter.createCaller(makeCtx(user));
-    // Use a unique date+time to avoid conflicts from prior test runs
+    const date = uniqueDate();
     const result = await caller.reservation.create({
-      date: "2029-06-10",
+      date,
       startTime: "06:00",
       duration: 60,
       contactPhone: "5551234567",
@@ -69,9 +82,9 @@ describe("reservation.create", () => {
 
   it("allows anonymous (unauthenticated) users to book", async () => {
     const caller = appRouter.createCaller(makeCtx());
-
+    const date = uniqueDate();
     const result = await caller.reservation.create({
-      date: "2029-06-11",
+      date,
       startTime: "14:00",
       duration: 60,
       contactPhone: "5559876543",
@@ -83,10 +96,11 @@ describe("reservation.create", () => {
   it("rejects duration that is not a multiple of 30", async () => {
     const user = makeUser();
     const caller = appRouter.createCaller(makeCtx(user));
+    const date = uniqueDate();
 
     await expect(
       caller.reservation.create({
-        date: "2026-04-15",
+        date,
         startTime: "10:00",
         duration: 45 as any,
         contactPhone: "5551234567",
@@ -96,8 +110,9 @@ describe("reservation.create", () => {
 
   it("accepts 30-minute single slot booking", async () => {
     const caller = appRouter.createCaller(makeCtx());
+    const date = uniqueDate();
     const result = await caller.reservation.create({
-      date: "2029-07-01",
+      date,
       startTime: "08:00",
       duration: 30,
       contactPhone: "5551111111",
@@ -109,8 +124,9 @@ describe("reservation.create", () => {
 
   it("accepts 90-minute multi-slot booking with correct price", async () => {
     const caller = appRouter.createCaller(makeCtx());
+    const date = uniqueDate();
     const result = await caller.reservation.create({
-      date: "2029-07-02",
+      date,
       startTime: "09:00",
       duration: 90,
       contactPhone: "5552222222",
@@ -122,8 +138,9 @@ describe("reservation.create", () => {
 
   it("applies 2-hour discount ($90 instead of $100)", async () => {
     const caller = appRouter.createCaller(makeCtx());
+    const date = uniqueDate();
     const result = await caller.reservation.create({
-      date: "2029-07-03",
+      date,
       startTime: "12:00",
       duration: 120,
       contactPhone: "5553333333",
@@ -134,10 +151,11 @@ describe("reservation.create", () => {
   it("requires contactPhone", async () => {
     const user = makeUser();
     const caller = appRouter.createCaller(makeCtx(user));
+    const date = uniqueDate();
 
     await expect(
       caller.reservation.create({
-        date: "2026-04-15",
+        date,
         startTime: "10:00",
         duration: 60,
         contactPhone: "",
@@ -186,10 +204,11 @@ describe("admin procedures", () => {
   it("rejects non-admin from creating session blocks", async () => {
     const user = makeUser({ role: "guest" });
     const caller = appRouter.createCaller(makeCtx(user));
+    const date = uniqueDate();
 
     await expect(
       caller.admin.reservations.createBlock({
-        date: "2026-04-15",
+        date,
         startTime: "09:00",
         endTime: "11:00",
         sessionName: "Open Play",
@@ -203,7 +222,6 @@ describe("admin procedures", () => {
 describe("tournament procedures", () => {
   it("allows public access to tournament list", async () => {
     const caller = appRouter.createCaller(makeCtx());
-    // Should not throw — public procedure
     const result = await caller.tournament.list();
     expect(Array.isArray(result)).toBe(true);
   });
@@ -228,11 +246,12 @@ describe("tournament procedures", () => {
   it("rejects non-admin from creating tournament", async () => {
     const user = makeUser({ role: "guest" });
     const caller = appRouter.createCaller(makeCtx(user));
+    const date = uniqueDate();
 
     await expect(
       caller.tournament.create({
         name: "Sunday Showdown",
-        date: "2026-04-20",
+        date,
       })
     ).rejects.toThrow();
   });
@@ -271,16 +290,17 @@ describe("leaderboard", () => {
 describe("openPlay procedures", () => {
   it("allows public access to get open play sessions by date", async () => {
     const caller = appRouter.createCaller(makeCtx());
-    const result = await caller.openPlay.getByDate({ date: "2027-06-01" });
+    const date = uniqueDate();
+    const result = await caller.openPlay.getByDate({ date });
     expect(Array.isArray(result)).toBe(true);
   });
 
   it("allows anonymous user to join an open play session", async () => {
-    // First create a session as admin
     const admin = makeUser({ role: "admin" });
     const adminCaller = appRouter.createCaller(makeCtx(admin));
+    const date = uniqueDate();
     const session = await adminCaller.openPlay.create({
-      date: "2027-07-15",
+      date,
       startTime: "09:00",
       endTime: "11:00",
       title: "Test Open Play",
@@ -317,10 +337,11 @@ describe("openPlay procedures", () => {
   it("rejects non-admin from creating open play sessions", async () => {
     const user = makeUser({ role: "guest" });
     const caller = appRouter.createCaller(makeCtx(user));
+    const date = uniqueDate();
 
     await expect(
       caller.openPlay.create({
-        date: "2027-07-20",
+        date,
         startTime: "09:00",
         endTime: "11:00",
         title: "Test",
@@ -357,11 +378,11 @@ describe("openPlay procedures", () => {
   });
 
   it("allows anonymous user to leave an open play session", async () => {
-    // Create session as admin
     const admin = makeUser({ role: "admin" });
     const adminCaller = appRouter.createCaller(makeCtx(admin));
+    const date = uniqueDate();
     const session = await adminCaller.openPlay.create({
-      date: "2027-08-01",
+      date,
       startTime: "10:00",
       endTime: "12:00",
       title: "Leave Test",

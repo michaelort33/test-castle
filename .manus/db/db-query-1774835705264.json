@@ -1,0 +1,45 @@
+{
+  "query": "SELECT id, date, startTime, endTime, status FROM reservations WHERE date IN ('2036-06-10', '2036-06-11', '2036-07-01', '2036-07-02', '2036-07-03', '2036-07-15', '2036-08-01');",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2BaPWTizQqDt2Cn.20cd508fb0a6 --database eCQCVHpxbypjRknfguuW2A --execute SELECT id, date, startTime, endTime, status FROM reservations WHERE date IN ('2036-06-10', '2036-06-11', '2036-07-01', '2036-07-02', '2036-07-03', '2036-07-15', '2036-08-01');",
+  "rows": [
+    {
+      "id": "30031",
+      "date": "2036-06-10",
+      "startTime": "06:00",
+      "endTime": "07:00",
+      "status": "confirmed"
+    },
+    {
+      "id": "30033",
+      "date": "2036-06-11",
+      "startTime": "14:00",
+      "endTime": "15:00",
+      "status": "confirmed"
+    },
+    {
+      "id": "30035",
+      "date": "2036-07-01",
+      "startTime": "08:00",
+      "endTime": "08:30",
+      "status": "confirmed"
+    },
+    {
+      "id": "30037",
+      "date": "2036-07-02",
+      "startTime": "09:00",
+      "endTime": "10:30",
+      "status": "confirmed"
+    },
+    {
+      "id": "30038",
+      "date": "2036-07-03",
+      "startTime": "12:00",
+      "endTime": "14:00",
+      "status": "confirmed"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tdate\tstartTime\tendTime\tstatus\n30031\t2036-06-10\t06:00\t07:00\tconfirmed\n30033\t2036-06-11\t14:00\t15:00\tconfirmed\n30035\t2036-07-01\t08:00\t08:30\tconfirmed\n30037\t2036-07-02\t09:00\t10:30\tconfirmed\n30038\t2036-07-03\t12:00\t14:00\tconfirmed\n",
+  "stderr": "",
+  "execution_time_ms": 61
+}

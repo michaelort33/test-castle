@@ -1,0 +1,100 @@
+{
+  "query": "SELECT date, startTime, endTime FROM reservations WHERE date >= '2035-01-01' LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2BaPWTizQqDt2Cn.20cd508fb0a6 --database eCQCVHpxbypjRknfguuW2A --execute SELECT date, startTime, endTime FROM reservations WHERE date >= '2035-01-01' LIMIT 20;",
+  "rows": [
+    {
+      "date": "2035-01-15",
+      "startTime": "07:00",
+      "endTime": "08:00"
+    },
+    {
+      "date": "2035-01-16",
+      "startTime": "07:00",
+      "endTime": "08:00"
+    },
+    {
+      "date": "2036-06-10",
+      "startTime": "06:00",
+      "endTime": "07:00"
+    },
+    {
+      "date": "2035-02-01",
+      "startTime": "10:00",
+      "endTime": "11:00"
+    },
+    {
+      "date": "2036-06-11",
+      "startTime": "14:00",
+      "endTime": "15:00"
+    },
+    {
+      "date": "2036-07-01",
+      "startTime": "08:00",
+      "endTime": "08:30"
+    },
+    {
+      "date": "2036-07-02",
+      "startTime": "09:00",
+      "endTime": "10:30"
+    },
+    {
+      "date": "2035-02-03",
+      "startTime": "18:00",
+      "endTime": "19:00"
+    },
+    {
+      "date": "2036-07-03",
+      "startTime": "12:00",
+      "endTime": "14:00"
+    },
+    {
+      "date": "2035-03-01",
+      "startTime": "08:00",
+      "endTime": "09:00"
+    },
+    {
+      "date": "2035-03-02",
+      "startTime": "08:00",
+      "endTime": "09:00"
+    },
+    {
+      "date": "2035-06-01",
+      "startTime": "06:00",
+      "endTime": "06:30"
+    },
+    {
+      "date": "2035-06-02",
+      "startTime": "06:00",
+      "endTime": "07:00"
+    },
+    {
+      "date": "2035-06-03",
+      "startTime": "06:00",
+      "endTime": "07:30"
+    },
+    {
+      "date": "2035-06-04",
+      "startTime": "06:00",
+      "endTime": "08:00"
+    },
+    {
+      "date": "2035-03-01",
+      "startTime": "08:00",
+      "endTime": "09:00"
+    },
+    {
+      "date": "2035-03-01",
+      "startTime": "08:00",
+      "endTime": "09:00"
+    },
+    {
+      "date": "2035-03-01",
+      "startTime": "08:00",
+      "endTime": "09:00"
+    }
+  ],
+  "messages": [],
+  "stdout": "date\tstartTime\tendTime\n2035-01-15\t07:00\t08:00\n2035-01-16\t07:00\t08:00\n2036-06-10\t06:00\t07:00\n2035-02-01\t10:00\t11:00\n2036-06-11\t14:00\t15:00\n2036-07-01\t08:00\t08:30\n2036-07-02\t09:00\t10:30\n2035-02-03\t18:00\t19:00\n2036-07-03\t12:00\t14:00\n2035-03-01\t08:00\t09:00\n2035-03-02\t08:00\t09:00\n2035-06-01\t06:00\t06:30\n2035-06-02\t06:00\t07:00\n2035-06-03\t06:00\t07:30\n2035-06-04\t06:00\t08:00\n2035-03-01\t08:00\t09:00\n2035-03-01\t08:00\t09:00\n2035-03-01\t08:00\t09:00\n",
+  "stderr": "",
+  "execution_time_ms": 58
+}

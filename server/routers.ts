@@ -11,11 +11,13 @@ import {
   createReservation, getReservationsByDate, getReservationsByUser,
   getAllReservations, cancelReservation, adminCancelReservation,
   updateReservationSessionName, getReservationById,
+  cancelReservationByCode,
   createAdminSessionBlock,
   createTournament, getAllTournaments, getTournamentById,
   updateTournamentWinner, updateTournamentStatus,
   registerForTournament, getTournamentRegistrations,
   getUserTournamentRegistrations, unregisterFromTournament,
+  getTournamentRegistrationCount,
   getAdminStats, getUserById,
   createOpenPlaySession, getOpenPlaySessionsByDate, getAllOpenPlaySessions,
   getOpenPlaySessionById, cancelOpenPlaySession, updateOpenPlaySession,
@@ -23,6 +25,35 @@ import {
   joinOpenPlaySession, leaveOpenPlaySession, adminCancelOpenPlaySignup,
 } from "./db";
 import { notifyOwner } from "./_core/notification";
+
+// ─── Shared conflict check helper ──────────────────────────────
+// Checks both reservations AND open play sessions for time conflicts on a given date
+async function checkTimeConflicts(date: string, startMins: number, endMins: number, excludeReservationId?: number) {
+  // Check reservation conflicts
+  const existingReservations = await getReservationsByDate(date);
+  for (const res of existingReservations) {
+    if (excludeReservationId && res.id === excludeReservationId) continue;
+    const [rsh, rsm] = res.startTime.split(":").map(Number);
+    const [reh, rem] = res.endTime.split(":").map(Number);
+    const resStart = rsh * 60 + rsm;
+    const resEnd = reh * 60 + rem;
+    if (startMins < resEnd && endMins > resStart) {
+      throw new TRPCError({ code: "CONFLICT", message: "This time slot conflicts with an existing reservation." });
+    }
+  }
+
+  // Check open play session conflicts
+  const existingSessions = await getOpenPlaySessionsByDate(date);
+  for (const session of existingSessions) {
+    const [ssh, ssm] = session.startTime.split(":").map(Number);
+    const [seh, sem] = session.endTime.split(":").map(Number);
+    const sessionStart = ssh * 60 + ssm;
+    const sessionEnd = seh * 60 + sem;
+    if (startMins < sessionEnd && endMins > sessionStart) {
+      throw new TRPCError({ code: "CONFLICT", message: "This time slot conflicts with an Open Play session." });
+    }
+  }
+}
 
 // ─── Reservation Router ─────────────────────────────────────────
 
@@ -60,18 +91,9 @@ const reservationRouter = router({
       const endMins = endMinutes % 60;
       const endTime = `${String(endHours).padStart(2, "0")}:${String(endMins).padStart(2, "0")}`;
 
-      // Check for conflicts
-      const existing = await getReservationsByDate(input.date);
+      // Check for conflicts against both reservations and open play sessions
       const startMins = hours * 60 + mins;
-      for (const res of existing) {
-        const [rsh, rsm] = res.startTime.split(":").map(Number);
-        const [reh, rem] = res.endTime.split(":").map(Number);
-        const resStart = rsh * 60 + rsm;
-        const resEnd = reh * 60 + rem;
-        if (startMins < resEnd && endMinutes > resStart) {
-          throw new TRPCError({ code: "CONFLICT", message: "This time slot conflicts with an existing reservation." });
-        }
-      }
+      await checkTimeConflicts(input.date, startMins, endMinutes);
 
       // Price: $25 per 30-min slot, with 2hr ($90) being a discount
       // 30min=$25, 60min=$50, 90min=$75, 120min=$90, 150min=$115, etc.
@@ -86,8 +108,8 @@ const reservationRouter = router({
       }
       const confirmationCode = nanoid(8).toUpperCase();
 
-      // Use the logged-in user's ID if available, otherwise 0 for anonymous
-      const userId = ctx.user?.id ?? 0;
+      // Use the logged-in user's ID if available, otherwise NULL for anonymous
+      const userId = ctx.user?.id ?? null;
 
       const id = await createReservation({
         userId,
@@ -107,12 +129,29 @@ const reservationRouter = router({
       return { id, confirmationCode, endTime, price };
     }),
 
-  // Cancel a reservation
+  // Cancel a reservation (authenticated user)
   cancel: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       await cancelReservation(input.id, ctx.user.id);
       return { success: true };
+    }),
+
+  // Cancel a reservation by confirmation code + phone (for anonymous users)
+  cancelByCode: publicProcedure
+    .input(z.object({
+      confirmationCode: z.string().min(1, "Confirmation code is required"),
+      contactPhone: z.string().min(1, "Phone number is required"),
+    }))
+    .mutation(async ({ input }) => {
+      const result = await cancelReservationByCode(input.confirmationCode, input.contactPhone);
+      if (!result) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "No matching reservation found. Please check your confirmation code and phone number.",
+        });
+      }
+      return { success: true, reservationId: result.id };
     }),
 });
 
@@ -137,7 +176,6 @@ const adminRouter = router({
     reject: adminProcedure
       .input(z.object({ userId: z.number() }))
       .mutation(async ({ input }) => {
-        // Keep as unapproved — admin can see them
         await updateUserRole(input.userId, "unapproved_guest");
         return { success: true };
       }),
@@ -174,21 +212,13 @@ const adminRouter = router({
         sessionName: z.string().min(1),
       }))
       .mutation(async ({ ctx, input }) => {
-        // Check for conflicts
-        const existing = await getReservationsByDate(input.date);
+        // Check for conflicts against both reservations and open play sessions
         const [sh, sm] = input.startTime.split(":").map(Number);
         const [eh, em] = input.endTime.split(":").map(Number);
         const startMins = sh * 60 + sm;
         const endMins = eh * 60 + em;
-        for (const res of existing) {
-          const [rsh, rsm] = res.startTime.split(":").map(Number);
-          const [reh, rem] = res.endTime.split(":").map(Number);
-          const resStart = rsh * 60 + rsm;
-          const resEnd = reh * 60 + rem;
-          if (startMins < resEnd && endMins > resStart) {
-            throw new TRPCError({ code: "CONFLICT", message: "This time slot conflicts with an existing reservation." });
-          }
-        }
+        await checkTimeConflicts(input.date, startMins, endMins);
+
         const id = await createAdminSessionBlock({
           date: input.date,
           startTime: input.startTime,
@@ -206,7 +236,12 @@ const adminRouter = router({
 const tournamentRouter = router({
   list: publicProcedure.query(async () => {
     const allTournaments = await getAllTournaments();
-    return allTournaments;
+    // Enrich with registration counts for capacity display
+    const enriched = await Promise.all(allTournaments.map(async (t) => {
+      const count = await getTournamentRegistrationCount(t.id);
+      return { ...t, registrationCount: count };
+    }));
+    return enriched;
   }),
 
   getById: publicProcedure
@@ -215,12 +250,13 @@ const tournamentRouter = router({
       const tournament = await getTournamentById(input.id);
       if (!tournament) throw new TRPCError({ code: "NOT_FOUND", message: "Tournament not found" });
       const registrations = await getTournamentRegistrations(input.id);
+      const registrationCount = registrations.length;
       let winnerName: string | null = null;
       if (tournament.winnerId) {
         const winner = await getUserById(tournament.winnerId);
         winnerName = winner?.name ?? null;
       }
-      return { ...tournament, registrations, winnerName };
+      return { ...tournament, registrations, registrationCount, winnerName };
     }),
 
   register: protectedProcedure
@@ -228,6 +264,18 @@ const tournamentRouter = router({
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role === "unapproved_guest") {
         throw new TRPCError({ code: "FORBIDDEN", message: "Your account is pending approval." });
+      }
+      // Enforce maxParticipants
+      const tournament = await getTournamentById(input.tournamentId);
+      if (!tournament) throw new TRPCError({ code: "NOT_FOUND", message: "Tournament not found" });
+      if (tournament.status !== "upcoming") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Registration is only open for upcoming tournaments." });
+      }
+      if (tournament.maxParticipants) {
+        const currentCount = await getTournamentRegistrationCount(input.tournamentId);
+        if (currentCount >= tournament.maxParticipants) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "This tournament is full." });
+        }
       }
       await registerForTournament(input.tournamentId, ctx.user.id);
       return { success: true };
@@ -356,13 +404,15 @@ const openPlayRouter = router({
       maxPlayers: z.number().min(1),
     }))
     .mutation(async ({ input }) => {
-      // Check for reservation conflicts
-      const existing = await getReservationsByDate(input.date);
+      // Check for conflicts against both reservations and open play sessions
       const [sh, sm] = input.startTime.split(":").map(Number);
       const [eh, em] = input.endTime.split(":").map(Number);
       const startMins = sh * 60 + sm;
       const endMins = eh * 60 + em;
-      for (const res of existing) {
+
+      // Check reservation conflicts
+      const existingReservations = await getReservationsByDate(input.date);
+      for (const res of existingReservations) {
         const [rsh, rsm] = res.startTime.split(":").map(Number);
         const [reh, rem] = res.endTime.split(":").map(Number);
         const resStart = rsh * 60 + rsm;
@@ -371,6 +421,19 @@ const openPlayRouter = router({
           throw new TRPCError({ code: "CONFLICT", message: "This time conflicts with an existing reservation." });
         }
       }
+
+      // Check open play session conflicts
+      const existingSessions = await getOpenPlaySessionsByDate(input.date);
+      for (const session of existingSessions) {
+        const [ssh, ssm] = session.startTime.split(":").map(Number);
+        const [seh, sem] = session.endTime.split(":").map(Number);
+        const sessionStart = ssh * 60 + ssm;
+        const sessionEnd = seh * 60 + sem;
+        if (startMins < sessionEnd && endMins > sessionStart) {
+          throw new TRPCError({ code: "CONFLICT", message: "This time conflicts with an existing Open Play session." });
+        }
+      }
+
       const id = await createOpenPlaySession({
         date: new Date(input.date + "T00:00:00"),
         startTime: input.startTime,

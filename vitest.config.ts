@@ -15,5 +15,15 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["server/**/*.test.ts", "server/**/*.spec.ts"],
+    pool: "forks",
+    poolOptions: {
+      forks: {
+        singleFork: true,
+      },
+    },
+    sequence: {
+      concurrent: false,
+    },
+    fileParallelism: false,
   },
 });

@@ -98,7 +98,7 @@ export default function Home() {
               </div>
               <h3 className="text-lg font-semibold mb-2">Simple Pricing</h3>
               <p className="text-muted-foreground">
-                <span className="font-semibold text-foreground">$50 per hour</span> or <span className="font-semibold text-foreground">$90 for two hours</span>. No hidden fees, no memberships required.
+                <span className="font-semibold text-foreground">$25 per 30 min</span> &middot; <span className="font-semibold text-foreground">$50 per hour</span> &middot; <span className="font-semibold text-foreground">$90 for two hours</span>. No hidden fees, no memberships required.
               </p>
             </CardContent>
           </Card>
@@ -125,7 +125,7 @@ export default function Home() {
           <div className="grid gap-8 md:grid-cols-3 max-w-3xl mx-auto">
             {[
               { step: "1", title: "Pick a Time", desc: "Browse the calendar and select your preferred 30-minute slots." },
-              { step: "2", title: "Enter Your Phone", desc: "Provide your phone number and receive a confirmation code instantly." },
+              { step: "2", title: "Enter Your Info", desc: "Provide your name and phone number. Your confirmation code appears on screen instantly." },
               { step: "3", title: "Play", desc: "Show up and own the court. It's that simple." },
             ].map((item) => (
               <div key={item.step} className="text-center">

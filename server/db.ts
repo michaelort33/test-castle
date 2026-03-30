@@ -162,6 +162,31 @@ export async function cancelReservation(reservationId: number, userId: number) {
     .where(and(eq(reservations.id, reservationId), eq(reservations.userId, userId)));
 }
 
+export async function cancelReservationByCode(confirmationCode: string, contactPhone: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  // Find the reservation by confirmation code and phone
+  const result = await db.select().from(reservations)
+    .where(and(
+      eq(reservations.confirmationCode, confirmationCode),
+      eq(reservations.contactPhone, contactPhone),
+      eq(reservations.status, "confirmed")
+    )).limit(1);
+  if (result.length === 0) return null;
+  await db.update(reservations)
+    .set({ status: "cancelled" })
+    .where(eq(reservations.id, result[0].id));
+  return result[0];
+}
+
+export async function getReservationByCode(confirmationCode: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(reservations)
+    .where(eq(reservations.confirmationCode, confirmationCode)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
 export async function adminCancelReservation(reservationId: number) {
   const db = await getDb();
   if (!db) return;
@@ -473,6 +498,14 @@ export async function adminCancelOpenPlaySignup(signupId: number) {
 }
 
 // ─── STATS ──────────────────────────────────────────────────────
+
+export async function getTournamentRegistrationCount(tournamentId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const [result] = await db.select({ count: sql<number>`count(*)` }).from(tournamentRegistrations)
+    .where(eq(tournamentRegistrations.tournamentId, tournamentId));
+  return Number(result.count);
+}
 
 export async function getAdminStats() {
   const db = await getDb();

@@ -124,3 +124,33 @@
 ### Gaps to Address
 - [x] Add open play edit/update endpoint and UI
 - [x] Add automated tests for open play join/waitlist/leave/promote
+
+## Audit Fixes (Round 9)
+
+### Tier 1: Critical Fixes
+- [x] Fix B1/B3: Make reservations.userId nullable, store NULL for anonymous bookings
+- [x] Fix B1/B3: Add reservation.cancelByCode public procedure (confirmationCode + contactPhone)
+- [x] Fix B1/B3: Add cancel-by-code UI on BookCourt page
+- [x] Fix B2: Add cross-system conflict detection (reservations vs open play sessions)
+- [x] Fix B4: Enforce tournament maxParticipants in tournament.register
+- [x] Fix B4: Add frontend Full badge when tournament is at capacity
+
+### Tier 2: High-Value Cleanup
+- [x] Fix B10: Add Edit button to Open Play admin session cards
+- [x] Add admin.users.reject/deny button in Admin UsersTab
+- [x] Fix B6: Move render-phase navigation in Dashboard.tsx and Admin.tsx into useEffect
+- [x] Fix B7: Move localStorage.setItem out of useMemo in useAuth.ts into useEffect
+
+### Tier 3: Schema/API Contract Fixes
+- [x] Fix B8: Add foreign key constraints to schema
+- [x] Fix B9: Add database indexes for frequently queried columns
+- [x] Fix B5: Remove (r as any) type assertions in Dashboard and Admin
+
+### Tier 4: Frontend Consistency Fixes
+- [x] Fix B11: Update landing page pricing to show full schedule ($25/30min, $50/hr, $90/2hr)
+- [x] Fix B12: Fix "How It Works" copy about confirmation code delivery
+- [x] Standardize duration display format across Dashboard and Admin
+- [x] Fix B13: Remove unused imports from main.tsx
+- [x] Remove dead template artifacts (ComponentShowcase, DashboardLayout, DashboardLayoutSkeleton, AIChatBox, Map)
+- [x] Fix B14: Fix NotFound.tsx to use semantic theme tokens
+- [x] Add profile/settings section with phone update UI in Dashboard

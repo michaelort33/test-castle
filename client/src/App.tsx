@@ -10,8 +10,8 @@ import BookCourt from "./pages/BookCourt";
 import Admin from "./pages/Admin";
 import Tournaments from "./pages/Tournaments";
 import PendingApproval from "./pages/PendingApproval";
-
 function Router() {
+  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
       <Route path={"/"} component={Home} />
